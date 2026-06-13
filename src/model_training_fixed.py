@@ -21,7 +21,16 @@ import time  # For performance timing
 
 # For learning curve visualization
 import matplotlib
-matplotlib.use('Agg')  # Non-interactive backend for server environment
+# Use appropriate backend for Colab (interactive) vs server (non-interactive)
+try:
+    import google.colab
+    # In Colab - use inline for real-time visualization
+    matplotlib.use('Agg')  # Still use Agg, but we'll display manually
+    IN_COLAB = True
+except:
+    # Not in Colab - use non-interactive backend
+    matplotlib.use('Agg')
+    IN_COLAB = False
 import matplotlib.pyplot as plt
 
 # Workaround for PyTorch compatibility with Transformers 5.10.2
@@ -1103,10 +1112,16 @@ class TimesFMVN30Finetuner:
             experiments_dir.mkdir(parents=True, exist_ok=True)
             curves_path = experiments_dir / 'learning_curves.png'
             plt.savefig(curves_path, dpi=100, bbox_inches='tight')
-            plt.close()
+
+            # Display inline in Colab
+            if IN_COLAB:
+                from IPython.display import Image, display
+                display(Image(str(curves_path)))
+            else:
+                plt.close()
 
             # Log update (only every epoch to avoid spam)
-            self.logger.debug(f"[LEARNING CURVES] Updated: {curves_path}")
+            self.logger.info(f"[LEARNING CURVES] Updated: {curves_path}")
 
         except Exception as e:
             self.logger.warning(f"[WARNING] Failed to plot learning curves: {e}")
