@@ -1,0 +1,202 @@
+# TimesFM VN30 Fine-tuning Configuration
+# Based on proper TimesFM architecture and pfnet-research methodology
+
+# System Configuration
+system:
+  name: "TimesFM VN30 Volatility Forecasting"
+  version: "2.0.0"  # New architecture version
+  device: "cuda"  # GPU required for TimesFM training
+  random_seed: 42
+  project: "TimesFM-VN30-Finetuning"
+
+# Data Configuration
+data:
+  # Vietnamese stocks (30 stocks from data/raw/prices/)
+  stocks:
+    - ACB  # Asia Commercial Bank
+    - BCM  # Bamboo Capital
+    - BID  # BIDV
+    - BVH  # Bao Viet Holdings
+    - CTG  # Vietcombank
+    - FPT  # FPT Corporation
+    - GAS  # PetroVietnam Gas
+    - GVR  # PetroVietnam Power
+    - HDB  # HDBank
+    - HPG  # Hoa Phat Group
+    - MBB  # Military Bank
+    - MSN  # Masan Group
+    - MWG  # Mobile World
+    - NVL  # Nam Bay Logistics
+    - PDR  # Phat Dat Real Estate
+    - PLX  # PetroVietnam Oil
+    - POW  # PetroVietnam Oil
+    - SAB  # Sabeco
+    - SHB  # Saigon-Hanoi Bank
+    - SSB  # Song Saigon Bank
+    - SSI  # Saigon Securities
+    - STB  # Sacombank
+    - TCB  # Techcombank
+    - TPB  # TPyBank
+    - VCB  # Vietcombank
+    - VHM  # Vin Homes
+    - VIB  # Vietinbank
+    - VIC  # Vingroup
+    - VJC  # Vingroup
+    - VNM  # Vinamilk
+
+  # Data paths
+  raw_path: "data/raw/prices"
+  processed_path: "data/processed"
+  features_path: "data/features"
+
+  # Data quality requirements
+  min_observations: 100  # Minimum trading days required
+  required_columns: ["date", "open", "high", "low", "close", "volume"]
+
+# Financial Data Processing
+financial:
+  # Log transformation (CRITICAL for financial data)
+  log_transform: true
+  log_transform_reason: "Prevents NaN loss during extreme market events"
+
+  # Realized volatility calculation
+  volatility_windows: [5, 10, 20, 30]  # Multiple horizons
+  target_volatility: "RV_20"  # Primary target: 20-day realized volatility
+
+  # Financial clipping
+  volatility_clip_range: [-5, 5]
+  clipping_reason: "Prevents extreme values while maintaining information"
+
+  # Vietnamese market features
+  vietnamese_features:
+    tet_holiday_detection: true
+    day_of_week_patterns: true
+    month_end_effects: true
+    earnings_season: false  # Can be added later
+
+# Dataset Configuration
+dataset:
+  # Multi-stock architecture
+  architecture: "channel_independent"  # Each stock as separate series
+  samples_per_stock: 200  # Random window samples per stock
+  total_target_samples: 6000  # Target total samples (200 × 30 stocks)
+
+  # Time series parameters
+  context_length: 64  # REDUCED for speed (was 128, TimesFM default is 128)
+  horizon_length: 1    # Single step prediction (1 day ahead)
+
+  # Train/test split
+  test_size: 0.2
+  split_method: "temporal"  # Time-based split to prevent data leakage
+
+  # Normalization
+  normalize_per_stock: true  # Handle different price ranges
+  normalization_method: "z_score"  # Standard scaling
+
+# Model Configuration
+model:
+  # Base model (using TimesFM 2.5 as per Google Research finetune_lora.py)
+  model_name: "google/timesfm-2.5-200m-transformers"
+  model_type: "TimesFM 2.5"
+  parameters: "200M"
+
+  # LoRA adapter configuration
+  lora:
+    enabled: true
+    r: 4                  # Rank (low for efficiency)
+    lora_alpha: 8         # Scaling factor
+    target_modules: "all-linear"
+    lora_dropout: 0.05
+    bias: "none"
+
+  # Model parameters
+  context_length: 64  # REDUCED for speed (was 128)
+  prediction_length: 1   # Single step prediction
+  torch_dtype: "bfloat16"  # Memory efficiency
+
+# Training Configuration
+training:
+  # Optimizer (Financial-specific)
+  optimizer: "SGD"
+  learning_rate: 0.0001  # 1e-4 (conservative, proven for financial data)
+  momentum: 0.9          # High momentum for stability
+  nesterov: true         # Nesterov momentum (faster convergence)
+
+  # Gradient management
+  gradient_clip: 1.0     # Prevent exploding gradients
+  gradient_accumulation: 1  # Can increase if memory limited
+
+  # Batch configuration
+  batch_size: 16  # Back to 16 (without torch.compile breaking things)
+  num_epochs: 50         # Total training epochs (reduced from 100 for faster training)
+  warmup_epochs: 5       # Warmup period
+
+  # Learning rate schedule
+  scheduler: "cosine_annealing"
+  min_learning_rate: 0.000001  # 1e-6
+  total_epochs: 100
+
+  # Checkpoint management
+  save_every_n_epochs: 10
+  keep_best_model: true
+  save_optimizer_state: true
+
+  # Early stopping
+  early_stopping_patience: 5  # Stop if no improvement for N epochs
+
+# Validation Configuration
+validation:
+  # Statistical testing
+  diebold_mariano_test:
+    enabled: true
+    significance_level: 0.05
+    benchmark: "zero_shot"  # Compare against baseline TimesFM
+
+  # Performance metrics (Mandatory function names)
+  metrics:
+    - "calculate_qlike"    # QLIKE metric (volatility-specific)
+    - "calculate_r2"      # R² score
+    - "calculate_rmse"    # Root Mean Square Error
+    - "calculate_mse"     # Mean Square Error
+
+  # Success criteria
+  target_r2: 0.5         # Target: Explain 50% of variance
+  target_significance: 0.05  # Statistical significance threshold
+
+# Experiment Tracking
+experiment_tracking:
+  backend: "json"  # Simple JSON logging (not MLFlow)
+  experiments_dir: "experiments"
+  log_format: "json"
+  save_metadata: true
+
+# Output Configuration
+output:
+  # Model checkpoints
+  checkpoints_dir: "models/checkpoints"
+  final_models_dir: "models/final_models"
+  model_format: "pytorch"
+
+  # Experiment logs
+  experiments_dir: "experiments"
+  log_training_metrics: true
+  save_predictions: true
+
+  # Model metadata
+  save_config: true
+  save_training_history: true
+  save_performance_metrics: true
+
+# Hardware Requirements
+hardware:
+  gpu_required: true
+  min_vram_gb: 16  # Recommended minimum
+  cpu_cores: 4     # Minimum for data processing
+  ram_gb: 16       # Minimum system RAM
+
+# Development Flags
+development:
+  debug_mode: false
+  verbose_logging: true
+  save_checkpoints: true
+  test_mode: false   # Set true for quick testing with small data
