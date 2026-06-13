@@ -102,3 +102,9 @@ experiment_tracking:
   models_dir: "models"
   log_level: "INFO"
   save_every: 10
+
+# Output Configuration
+output:
+  checkpoints_dir: "models/checkpoints"
+  predictions_dir: "experiments/predictions"
+  logs_dir: "experiments/logs"
