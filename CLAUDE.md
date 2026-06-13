@@ -585,6 +585,146 @@ def log_experiment(epoch, metrics, config):
         json.dump(experiment_log, f, indent=2)
 ```
 
+### 7.4 File Management and Archiving
+- **Archive Old Files:** Khi fix hoặc tạo file mới, bắt buộc move file cũ vào `archived/` folder:
+```python
+# ✅ CORRECT - Archive old files
+# Cấu trúc thư mục:
+project/
+├── src/                    # Code hiện hành (active code)
+│   ├── model_training.py
+│   ├── data_processing.py
+│   └── model_evaluation.py
+└── archived/               # Code cũ (reference only)
+    ├── train_old_2025-06-13_refactored.py
+    ├── processing_v1.py
+    └── evaluate_old_2025-06-13_bugfix.py
+
+# Quy tắc đặt tên archived files:
+# filename_old_DATE_REASON.py
+# Ví dụ: model_training_old_2025-06-13_refactored.py
+# Ví dụ: data_processing_old_2025-06-13_bugfix_v1.py
+
+# Khi fix file:
+# 1. Move file cũ sang archived/
+mv src/train.py archived/train_old_2025-06-13_refactored.py
+
+# 2. Tạo file mới với tên improved
+# src/train.py → src/model_training.py (better name)
+```
+
+- **Tại sao phải archive:**
+  - Tránh clutter trong thư mục src/
+  - Dễ biết file nào đang được sử dụng
+  - Giữ reference cho việc debug và học hỏi
+  - Track evolution của codebase
+
+### 7.5 Learning Curves (MANDATORY)
+- **BẮT BUỘC Vẽ Learning Curves:** Mọi lần training đều phải vẽ learning curves để detect overfitting:
+```python
+import matplotlib.pyplot as plt
+from pathlib import Path
+
+def plot_learning_curves(train_losses, val_losses, save_path, epoch=None):
+    """
+    Vẽ learning curves để detect overfitting.
+    
+    MANDATORY cho tất cả training runs:
+    - Training loss vs validation loss
+    - Detect overfitting: val loss tăng trong khi train loss giảm
+    - Detect underfitting: cả train và val loss đều cao
+    - Visual convergence behavior
+    
+    Args:
+        train_losses: List training losses per epoch
+        val_losses: List validation losses per epoch  
+        save_path: Path để save plot
+        epoch: Current epoch number (optional)
+    """
+    plt.figure(figsize=(10, 6))
+    plt.plot(train_losses, label='Training Loss', linewidth=2)
+    plt.plot(val_losses, label='Validation Loss', linewidth=2)
+    plt.xlabel('Epoch', fontsize=12)
+    plt.ylabel('Loss', fontsize=12)
+    plt.title('Learning Curves - TimesFM Training', fontsize=14)
+    plt.legend(fontsize=10)
+    plt.grid(True, alpha=0.3)
+    
+    # Save plot
+    Path(save_path).parent.mkdir(parents=True, exist_ok=True)
+    plt.savefig(save_path, dpi=150, bbox_inches='tight')
+    plt.close()
+    
+    # Check for overfitting
+    if len(val_losses) > 10 and epoch is not None:
+        recent_val = val_losses[-5:]
+        if all(recent_val[i] > recent_val[i-1] for i in range(1, len(recent_val))):
+            logging.warning(f"⚠️ Epoch {epoch}: Validation loss increasing - possible OVERFITTING!")
+            logging.warning(f"   Recent val losses: {recent_val}")
+    
+    if epoch is not None:
+        logging.info(f"💾 Learning curve saved: {save_path}")
+
+# During training
+train_losses = []
+val_losses = []
+
+for epoch in range(num_epochs):
+    train_loss = train_epoch(model, train_loader, optimizer)
+    val_metrics = evaluate_model(model, val_loader)
+    val_loss = val_metrics['val_loss']
+    
+    train_losses.append(train_loss)
+    val_losses.append(val_loss)
+    
+    # Log metrics
+    logging.info(f"Epoch {epoch+1}/{num_epochs}")
+    logging.info(f"  Train Loss: {train_loss:.6f}")
+    logging.info(f"  Val Loss: {val_loss:.6f}")
+    
+    # Vẽ learning curves mỗi 10 epochs
+    if (epoch + 1) % 10 == 0:
+        plot_path = f'experiments/learning_curves_epoch_{epoch+1}.png'
+        plot_learning_curves(train_losses, val_losses, plot_path, epoch+1)
+    
+    # Early stopping nếu overfitting
+    if len(val_losses) > 10:
+        recent_val_trend = val_losses[-5:]
+        is_increasing = all(recent_val_trend[i] > recent_val_trend[i-1] 
+                           for i in range(1, len(recent_val_trend)))
+        if is_increasing:
+            logging.warning(f"🚨 Overfitting detected at epoch {epoch+1}")
+            logging.warning(f"   Applying early stopping...")
+            break
+
+# Final learning curves (MANDATORY)
+final_plot_path = 'experiments/learning_curves_final.png'
+plot_learning_curves(train_losses, val_losses, final_plot_path)
+logging.info(f"✅ Final learning curves saved: {final_plot_path}")
+
+# Lưu learning curves vào experiment metadata
+experiment_log['learning_curves_path'] = final_plot_path
+```
+
+- **Khi nào overfitting xảy ra:**
+  - Validation loss tăng trong khi training loss giảm
+  - Gap lớn giữa training và validation loss
+  - Training accuracy ~100% nhưng validation thấp hơn nhiều
+
+- **Giải pháp overfitting:**
+  1. Thêm regularization (dropout, weight decay)
+  2. Giảm model complexity
+  3. Tăng training data
+  4. Data augmentation
+  5. Early stopping dựa trên validation loss
+
+- **Rules:**
+  - MANDATORY: Vẽ learning curves cho TẤT CẢ training runs
+  - Plot mỗi N epochs (ví dụ: mỗi 10 epochs)
+  - Luôn save final learning curve
+  - Include learning curves trong experiment reports
+  - Sử dụng learning curves để detect overfitting sớm
+
 ## 8. GPU Training Considerations
 
 ### 8.1 GPU Memory Management
