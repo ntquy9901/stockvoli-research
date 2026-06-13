@@ -71,7 +71,10 @@ except:
 # Now import PEFT components
 from peft import LoraConfig, get_peft_model
 
-# Set up logging
+# Set up logging - Create experiments directory first
+Path('experiments').mkdir(exist_ok=True)
+Path('models').mkdir(exist_ok=True)
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
