@@ -1,0 +1,98 @@
+# TimesFM Staging Configuration - Colab Free Tier Testing
+# Google Colab Free Tier (T4 16GB GPU) - Safe for testing
+
+# System Configuration
+system:
+  name: "TimesFM VN30 Volatility Forecasting - Staging"
+  version: "2.0.0"
+  device: "cuda"
+  random_seed: 42
+  project: "TimesFM-VN30-Finetuning-Staging"
+
+# Data Configuration
+data:
+  processed_path: "data/processed"
+  stocks:
+    - ACB BCM BID BVH CTG FPT GAS GVR HDB HPG MBB MSN MWG NVL PDR PLX POW SAB SHB SSB SSI STB TCB TPB VCB VHM VIB VIC VJC VNM
+
+# Dataset Configuration
+dataset:
+  context_length: 64  # Safe for 16GB
+  horizon_length: 1
+  samples_per_stock: 10  # Minimal for testing (instead of 150)
+
+# Model Configuration
+model:
+  model_name: "google/timesfm-2.5-200m-transformers"
+  parameters:
+    context_length: 64
+    prediction_length: 1
+    use_gradient_checkpointing: true
+    dtype: "bfloat16"
+  lora:
+    r: 4
+    lora_alpha: 8
+    target_modules: "all-linear"
+    lora_dropout: 0.05
+    bias: "none"
+
+# Training Configuration - Staging (Free Tier)
+training:
+  batch_size: 8  # SAFE for T4 16GB
+  gradient_accumulation_steps: 8  # Effective batch = 64
+  learning_rate: 0.0001
+  epochs: 5  # STAGING - Test with 5 epochs first
+  num_epochs: 5  # STAGING - Test with 5 epochs first
+  optimizer: "SGD"
+  max_grad_norm: 1.0
+
+  # Memory optimizations
+  num_workers: 2  # Reduced for free tier
+  use_mixed_precision: true
+  memory_efficient_attention: true
+  gradient_checkpointing: true
+
+# Incremental Learning
+incremental_learning:
+  window_size: 90
+  overlap: 30
+  epochs_per_window: 1
+
+# Evaluation Configuration
+evaluation:
+  metrics:
+    - QLIKE
+    - R2
+    - RMSE
+    - MSE
+  statistical_tests:
+    - diebold_mariano
+    - giacomini_white
+
+# Experiment Tracking
+experiment_tracking:
+  experiments_dir: "experiments"
+  models_dir: "models"
+  log_level: "INFO"
+  save_every: 10
+  save_every_n_epochs: 10
+
+# Output Configuration
+output:
+  checkpoints_dir: "models/checkpoints"
+  predictions_dir: "experiments/predictions"
+  logs_dir: "experiments/logs"
+
+# T4-Specific Optimizations
+t4_optimization:
+  aggressive_memory_management: true
+  max_memory_utilization: 0.90  # Use max 90% of 16GB
+  cleanup_cache_frequency: 5  # Clean cache every 5 batches
+
+# STAGING NOTES:
+# - Use this config for Colab Free Tier testing
+# - Tests with 5 epochs, 10 samples per stock
+# - Batch size 8 (safe for T4 16GB)
+# - Expected runtime: 1-2 hours on free tier
+# - If successful → proceed to Pro tier with full config
+# - If fails → fix locally (no cost!)
