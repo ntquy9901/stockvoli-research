@@ -102,6 +102,7 @@ experiment_tracking:
   models_dir: "models"
   log_level: "INFO"
   save_every: 10
+  save_every_n_epochs: 10  # Script expects 'save_every_n_epochs'
 
 # Output Configuration
 output:
