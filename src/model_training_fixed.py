@@ -976,57 +976,76 @@ class TimesFMVN30Finetuner:
         for epoch in range(num_epochs):
             self.current_epoch = epoch
 
-            # Train one epoch
-            train_metrics = self.train_one_epoch(train_loader, epoch, num_epochs)
+            try:
+                # Train one epoch
+                train_metrics = self.train_one_epoch(train_loader, epoch, num_epochs)
 
-            # Validate
-            val_metrics = self.validate_model(test_loader)
+                # Validate
+                val_metrics = self.validate_model(test_loader)
 
-            # Log epoch results
-            self.logger.info("=" * 70)
-            self.logger.info(f"EPOCH {epoch+1}/{num_epochs} COMPLETE")
-            self.logger.info("=" * 70)
-            self.logger.info(f"Train Loss: {train_metrics['loss']:.4f}")
-            self.logger.info(f"Val Loss: {val_metrics['val_loss']:.4f}")
-
-            # Store training history
-            epoch_log = {
-                'epoch': epoch + 1,
-                'timestamp': datetime.now().isoformat(),
-                'train_metrics': train_metrics,
-                'val_metrics': val_metrics
-            }
-            self.training_history.append(epoch_log)
-
-            # Save best model
-            if val_metrics['val_loss'] < self.best_val_loss:
-                self.best_val_loss = val_metrics['val_loss']
-                self.epochs_since_improvement = 0  # Reset counter
-                self.save_checkpoint('best_model')
-                self.logger.info(f"[NEW BEST] Val loss = {val_metrics['val_loss']:.4f}")
-            else:
-                self.epochs_since_improvement += 1
-                self.logger.info(f"[NO IMPROVEMENT] {self.epochs_since_improvement}/{self.early_stopping_patience} epochs since best")
-
-            # Early stopping check
-            if self.epochs_since_improvement >= self.early_stopping_patience:
+                # Log epoch results
                 self.logger.info("=" * 70)
-                self.logger.info(f"[EARLY STOPPING] No improvement for {self.early_stopping_patience} epochs")
-                self.logger.info(f"Stopping at epoch {epoch+1}/{num_epochs}")
-                self.logger.info(f"Best val loss: {self.best_val_loss:.4f}")
+                self.logger.info(f"EPOCH {epoch+1}/{num_epochs} COMPLETE")
                 self.logger.info("=" * 70)
-                break
+                self.logger.info(f"Train Loss: {train_metrics['loss']:.4f}")
+                self.logger.info(f"Val Loss: {val_metrics['val_loss']:.4f}")
 
-            # Periodic checkpoint
-            if (epoch + 1) % self.config['training']['save_every_n_epochs'] == 0:
-                self.save_checkpoint(f'checkpoint_epoch_{epoch+1}')
-                self.logger.info(f"[CHECKPOINT] Saved epoch {epoch+1}")
+                # Store training history
+                epoch_log = {
+                    'epoch': epoch + 1,
+                    'timestamp': datetime.now().isoformat(),
+                    'train_metrics': train_metrics,
+                    'val_metrics': val_metrics
+                }
+                self.training_history.append(epoch_log)
 
-            # Save training history
-            self.save_training_history()
+                # Save best model
+                if val_metrics['val_loss'] < self.best_val_loss:
+                    self.best_val_loss = val_metrics['val_loss']
+                    self.epochs_since_improvement = 0  # Reset counter
+                    self.save_checkpoint('best_model')
+                    self.logger.info(f"[NEW BEST] Val loss = {val_metrics['val_loss']:.4f}")
+                else:
+                    self.epochs_since_improvement += 1
+                    self.logger.info(f"[NO IMPROVEMENT] {self.epochs_since_improvement}/{self.early_stopping_patience} epochs since best")
 
-            # Update learning curves (REAL-TIME VISUALIZATION)
-            self.plot_learning_curves()
+                # Early stopping check
+                if self.epochs_since_improvement >= self.early_stopping_patience:
+                    self.logger.info("=" * 70)
+                    self.logger.info(f"[EARLY STOPPING] No improvement for {self.early_stopping_patience} epochs")
+                    self.logger.info(f"Stopping at epoch {epoch+1}/{num_epochs}")
+                    self.logger.info(f"Best val loss: {self.best_val_loss:.4f}")
+                    self.logger.info("=" * 70)
+                    break
+
+                # Periodic checkpoint
+                if (epoch + 1) % self.config['training']['save_every_n_epochs'] == 0:
+                    self.save_checkpoint(f'checkpoint_epoch_{epoch+1}')
+                    self.logger.info(f"[CHECKPOINT] Saved epoch {epoch+1}")
+
+                # Save training history (with error handling)
+                self.save_training_history()
+
+                # Update learning curves (REAL-TIME VISUALIZATION)
+                self.plot_learning_curves()
+
+            except Exception as e:
+                self.logger.error("=" * 70)
+                self.logger.error(f"[ERROR] Exception during epoch {epoch+1}: {e}")
+                self.logger.error("=" * 70)
+                self.logger.error(f"[ERROR] Training stopped due to error")
+                self.logger.error(f"[ERROR] Best val loss so far: {self.best_val_loss:.4f}")
+                self.logger.error(f"[ERROR] Epochs completed: {epoch+1}/{num_epochs}")
+
+                # Save what we have before exiting
+                try:
+                    self.save_training_history()
+                    self.plot_learning_curves()
+                except:
+                    pass
+
+                # Re-raise to exit
+                raise
 
     def save_checkpoint(self, model_name: str) -> None:
         """
@@ -1047,13 +1066,20 @@ class TimesFMVN30Finetuner:
 
     def save_training_history(self) -> None:
         """Save training history to JSON"""
-        experiments_dir = Path(self.config['experiment_tracking']['experiments_dir'])
-        experiments_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            experiments_dir = Path(self.config['experiment_tracking']['experiments_dir'])
+            experiments_dir.mkdir(parents=True, exist_ok=True)
 
-        history_path = experiments_dir / 'training_history.json'
+            history_path = experiments_dir / 'training_history.json'
 
-        with open(history_path, 'w') as f:
-            json.dump(self.training_history, f, indent=2)
+            with open(history_path, 'w') as f:
+                json.dump(self.training_history, f, indent=2)
+
+            self.logger.info(f"[HISTORY] Saved: {history_path}")
+
+        except Exception as e:
+            self.logger.warning(f"[WARNING] Failed to save training history: {e}")
+            self.logger.warning(f"[WARNING] Training will continue, but history may not be saved")
 
     def plot_learning_curves(self) -> None:
         """
