@@ -324,9 +324,8 @@ def create_vn30_dataloaders(config_path: str = 'configs/config.yaml',
     # Create dataloaders with OPTIMIZED settings for faster training
     batch_size = config['training']['batch_size']
 
-    # OPTIMIZATION: Use num_workers>0 for parallel data loading (Windows-safe with proper settings)
-    # INCREASED for better performance: 4 → 8 workers
-    num_workers = min(8, os.cpu_count() or 1)  # More parallel workers
+    # OPTIMIZATION: Use num_workers from config or default to 4 for parallel data loading
+    num_workers = config['training'].get('num_workers', min(4, os.cpu_count() or 1))
     persistent_workers = num_workers > 0  # Keep workers alive between epochs
 
     train_loader = DataLoader(
