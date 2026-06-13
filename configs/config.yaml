@@ -46,8 +46,11 @@ training:
   optimizer: "SGD"
   max_grad_norm: 1.0
 
-  # Memory optimizations
-  num_workers: 3  # Increased with 53GB system RAM
+  # Memory optimizations - OPTIMIZED for 53GB system RAM
+  num_workers: 6  # Increased from 3 to better utilize 53GB RAM
+  pin_memory: true  # Faster CPU->GPU data transfer
+  prefetch_factor: 3  # Preload 3 batches per worker (53GB RAM can handle it)
+  persistent_workers: true  # Keep workers alive between epochs
   use_mixed_precision: true
   memory_efficient_attention: true
   gradient_checkpointing: true
@@ -87,3 +90,5 @@ output:
 g4_optimization:
   max_gpu_utilization: 0.85  # Use 85% of 22.5GB (leave buffer)
   batch_tuning: true  # Auto-adjust batch size if needed
+  system_ram_utilization: 0.70  # Use 70% of 53GB system RAM for data loading
+  total_prefetch_batches: 18  # 6 workers × 3 prefetch_factor = 18 batches preloaded
