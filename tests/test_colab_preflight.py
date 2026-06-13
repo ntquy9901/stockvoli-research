@@ -178,7 +178,7 @@ class TestImportValidation:
     def test_torch_import(self):
         """Test PyTorch import."""
         assert torch is not None
-        assert torch.cuda is_available, "CUDA not available"
+        assert torch.cuda.is_available(), "CUDA not available"
 
     def test_pandas_import(self):
         """Test pandas import."""
@@ -493,7 +493,7 @@ class TestEndToEndValidation:
 
         # Should pass all checks
         assert result.returncode == 0, f"Preflight failed: {result.stderr}"
-        assert "✅ ALL CHECKS PASSED" in result.stdout
+        assert "[PASS] ALL CHECKS PASSED" in result.stdout
 
     def test_preflight_with_invalid_config(self):
         """Test pre-flight catches invalid config."""
@@ -522,7 +522,7 @@ class TestEndToEndValidation:
 
             # Should fail validation
             assert result.returncode != 0, "Should have failed with invalid config"
-            assert "❌" in result.stdout, "Should show validation errors"
+            assert "[FAIL]" in result.stdout, "Should show validation errors"
 
         finally:
             Path(temp_config).unlink()

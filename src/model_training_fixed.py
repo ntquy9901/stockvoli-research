@@ -1019,7 +1019,7 @@ class TimesFMVN30Finetuner:
                     break
 
                 # Periodic checkpoint
-                if (epoch + 1) % self.config['training']['save_every_n_epochs'] == 0:
+                if (epoch + 1) % self.config['experiment_tracking']['save_every_n_epochs'] == 0:
                     self.save_checkpoint(f'checkpoint_epoch_{epoch+1}')
                     self.logger.info(f"[CHECKPOINT] Saved epoch {epoch+1}")
 
