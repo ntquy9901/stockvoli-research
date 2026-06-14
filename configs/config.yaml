@@ -36,10 +36,10 @@ model:
     lora_dropout: 0.05
     bias: "none"
 
-# Training Configuration - G4 22.5GB OPTIMIZED (CONTEXT-LENGTH-OPTIMIZED)
+# Training Configuration - G4 22.5GB OPTIMIZED (CONTEXT + BATCH OPTIMIZED)
 training:
-  batch_size: 20  # OPTIMIZED - Context 32 reduces activation memory, allows larger batch
-  gradient_accumulation_steps: 2  # Effective batch = 20 × 2 = 40 (slightly less, but faster)
+  batch_size: 12  # CONSERVATIVE - Context 32 + batch 12 = safe combo
+  gradient_accumulation_steps: 3  # Effective batch = 12 × 3 = 36 (good balance)
   learning_rate: 0.0001
   num_epochs: 100
   optimizer: "SGD"
@@ -90,5 +90,5 @@ g4_optimization:
   batch_tuning: true  # Auto-adjust batch size if needed
   system_ram_utilization: 0.70  # Use 70% of 53GB system RAM for data loading
   total_prefetch_batches: 18  # 6 workers × 3 prefetch_factor = 18 batches preloaded
-  batch_size_optimization: "Context-optimized: ctx 64→32, batch 12→20 with grad_acc 2 → effective 40 (optimal)"  # Memory-optimal
-  expected_speedup: "~2-3x faster per epoch (context reduction + larger batch)"  # Optimized estimate
+  batch_size_optimization: "Combined: ctx 64→32, batch 12 with grad_acc 3 → effective 36 (memory-safe)"  # Safe combo
+  expected_speedup: "~2x faster per epoch (context reduction + moderate batch)"  # Conservative estimate
