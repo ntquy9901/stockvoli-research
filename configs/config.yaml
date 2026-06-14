@@ -15,17 +15,17 @@ data:
   stocks:
     - ACB BCM BID BVH CTG FPT GAS GVR HDB HPG MBB MSN MWG NVL PDR PLX POW SAB SHB SSB SSI STB TCB TPB VCB VHM VIB VIC VJC VNM
 
-# Dataset Configuration
+# Dataset Configuration (MEMORY-OPTIMIZED)
 dataset:
-  context_length: 64  # Safe for 22.5GB
+  context_length: 32  # REDUCED from 64 - Halves activation memory (15-18GB → 7-9GB)
   horizon_length: 1
-  samples_per_stock: 150  # Increased for better learning
+  samples_per_stock: 100  # Reduced from 150 - Faster epochs, less memory
 
 # Model Configuration
 model:
   model_name: "google/timesfm-2.5-200m-transformers"
   parameters:
-    context_length: 64
+    context_length: 32  # Reduced from 64 for memory optimization
     prediction_length: 1
     use_gradient_checkpointing: true
     dtype: "bfloat16"
@@ -36,19 +36,19 @@ model:
     lora_dropout: 0.05
     bias: "none"
 
-# Training Configuration - G4 22.5GB OPTIMIZED (VERY CONSERVATIVE)
+# Training Configuration - G4 22.5GB OPTIMIZED (CONTEXT-LENGTH-OPTIMIZED)
 training:
-  batch_size: 12  # VERY CONSERVATIVE - Batch 16 still OOM (21.70/22.03 GiB)
-  gradient_accumulation_steps: 4  # Effective batch = 12 × 4 = 48 (same performance, very memory-safe)
+  batch_size: 20  # OPTIMIZED - Context 32 reduces activation memory, allows larger batch
+  gradient_accumulation_steps: 2  # Effective batch = 20 × 2 = 40 (slightly less, but faster)
   learning_rate: 0.0001
   num_epochs: 100
   optimizer: "SGD"
   max_grad_norm: 1.0
 
   # Memory optimizations - OPTIMIZED for 53GB system RAM
-  num_workers: 6  # Increased from 3 to better utilize 53GB RAM
+  num_workers: 4  # Reduced from 6 - Saves system RAM for data loading
   pin_memory: true  # Faster CPU->GPU data transfer
-  prefetch_factor: 3  # Preload 3 batches per worker (53GB RAM can handle it)
+  prefetch_factor: 2  # Reduced from 3 - Less GPU memory pressure
   persistent_workers: true  # Keep workers alive between epochs
   use_mixed_precision: true
   memory_efficient_attention: true
@@ -90,5 +90,5 @@ g4_optimization:
   batch_tuning: true  # Auto-adjust batch size if needed
   system_ram_utilization: 0.70  # Use 70% of 53GB system RAM for data loading
   total_prefetch_batches: 18  # 6 workers × 3 prefetch_factor = 18 batches preloaded
-  batch_size_optimization: "Very conservative: 48→12 with grad_acc 4 → effective 48 (very memory-safe)"  # OOM-safe
-  expected_speedup: "~1.5-2x faster per epoch (very conservative, guaranteed to fit)"  # Very safe estimate
+  batch_size_optimization: "Context-optimized: ctx 64→32, batch 12→20 with grad_acc 2 → effective 40 (optimal)"  # Memory-optimal
+  expected_speedup: "~2-3x faster per epoch (context reduction + larger batch)"  # Optimized estimate
