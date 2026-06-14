@@ -1,0 +1,11 @@
+{
+  "test_type": "TRUE_OUT_OF_SAMPLE_TEMPORAL_SPLIT",
+  "test_method": "Last 20% of each stock (temporal split)",
+  "data_leakage": "FALSE",
+  "QLIKE": -4.006327152252197,
+  "R2": 0.519311398267746,
+  "RMSE": 0.006154363043606281,
+  "MSE": 3.7876183341722935e-05,
+  "MAE": 0.004071149509400129,
+  "Directional_Accuracy": 51.41388174807198
+}

@@ -1,0 +1,214 @@
+DIFF_OUTPUT:
+
+diff --git a/configs/config.yaml b/configs/config.yaml
+index 2287c16..6c55c09 100644
+--- a/configs/config.yaml
++++ b/configs/config.yaml
+@@ -41,7 +41,6 @@ training:
+   batch_size: 12  # OPTIMIZED for 22.5GB (bigger than T4 16GB)
+   gradient_accumulation_steps: 6  # Effective batch = 72
+   learning_rate: 0.0001
+-  epochs: 100
+   num_epochs: 100
+   optimizer: "SGD"
+   max_grad_norm: 1.0
+@@ -77,7 +76,6 @@ experiment_tracking:
+   experiments_dir: "experiments"
+   models_dir: "models"
+   log_level: "INFO"
+-  save_every: 10
+   save_every_n_epochs: 10
+
+ # Output Configuration
+diff --git a/configs/config_staging.yaml b/configs/config_staging.yaml
+index 9eba950..fa0236d 100644
+--- a/configs/config_staging.yaml
++++ b/configs/config_staging.yaml
+@@ -41,7 +41,6 @@ training:
+   batch_size: 8  # SAFE for T4 16GB
+   gradient_accumulation_steps: 8  # Effective batch = 64
+   learning_rate: 0.0001
+-  epochs: 5  # STAGING - Test with 5 epochs first
+   num_epochs: 5  # STAGING - Test with 5 epochs first
+   optimizer: "SGD"
+   max_grad_norm: 1.0
+@@ -74,7 +73,6 @@ experiment_tracking:
+   experiments_dir: "experiments"
+   models_dir: "models"
+   log_level: "INFO"
+-  save_every: 10
+   save_every_n_epochs: 10
+
+ # Output Configuration
+diff --git a/src/model_training_fixed.py b/src/model_training_fixed.py
+index 7c8bfb4..c75c97c 100644
+--- a/src/model_training_fixed.py
++++ b/src/model_training_fixed.py
+@@ -33,51 +33,10 @@ except:
+     IN_COLAB = False
+ import matplotlib.pyplot as plt
+
+-# Workaround for PyTorch compatibility with Transformers 5.10.2
+-if not hasattr(torch, 'float8_e8m0fnu'):
+-    torch.float8_e8m0fnu = torch.float8_e4m3fn
+-
+ # HuggingFace Transformers
+ from transformers import TimesFm2_5ModelForPrediction
+
+-# Monkey-patch importlib to completely disable bitsandbytes detection
+-import sys
+-import types
+-import importlib.util
+-
+-# Store original find_spec
+-original_find_spec = importlib.util.find_spec
+-
+-# Patch find_spec to return None for bitsandbytes
+-def patched_find_spec(name, package=None):
+-    if name and 'bitsandbytes' in name:
+-        return None  # Report as not found
+-    return original_find_spec(name, package)
+-
+-importlib.util.find_spec = patched_find_spec
+-
+-# Create minimal fake module for safety
+-fake_bnb = types.ModuleType('bitsandbytes')
+-fake_bnb.__path__ = []
+-fake_bnb.__file__ = '<disabled>'
+-sys.modules['bitsandbytes'] = fake_bnb
+-
+-# CRITICAL: Set CUDA memory management BEFORE any PyTorch operations
+-# This prevents memory fragmentation on 8GB GPU
+-os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
+-
+-# Patch PEFT utilities if they should exist
+-try:
+-    import peft.import_utils as peft_utils
+- except:
+-    pass
+-
+-# Now import PEFT components
++# PEFT components for LoRA adapters
+ from peft import LoraConfig, get_peft_model
+
+ # Set up logging - Create experiments directory first
+@@ -1155,6 +1114,10 @@ class TimesFMVN30Finetuner:
+ def main():
+     """Main execution function"""
+
++    # CRITICAL: Set CUDA memory management BEFORE any PyTorch operations
++    # This prevents memory fragmentation on 8GB GPU
++    os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
++
+     # Initialize finetuner
+     finetuner = TimesFMVN30Finetuner
+
+diff --git a/tests/test_colab_preflight.py b/tests/test_colab_preflight.py
+index a5a9466..2b3f455 100644
+--- a/tests/test_colab_preflight.py
++++ b/tests/test_colab_preflight.py
+@@ -196,6 +196,106 @@ class TestImportValidation:
+         assert yaml is not None
+
+
++class TestCleanModuleImport:
++    """Test that module imports cleanly without monkey patching."""
++
++    def test_no_monkey_patching_in_training_module(self):
++        """Test that training module does not contain monkey patching code."""
++        with open('src/model_training_fixed.py', 'only': [f:
++
++        # Check for forbidden monkey patching patterns
++        forbidden_patterns = [
++            'importlib.util.find_spec',  # Monkey patching importlib
++            'patched_find_spec',         # Patched find_spec function
++            'sys.modules[\'bitsandbytes\']',  # Fake module injection
++            'peft_utils.is_bnb_available',  # PEFT monkey patching
++            'float8_e8m0fnu',            # PyTorch compatibility workaround
++        ]
++
++        for pattern in forbidden_patterns:
++            assert pattern not in code, f"Found forbidden monkey patching pattern: {pattern}"
++
++    def test_clean_import_of_training_module(self):
++        """Test that training module imports cleanly OR gives clear incompatibility error."""
++        import subprocess
++        import sys
++
++        # Test import in clean Python environment
++        result = subprocess.run(
++            [sys.executable, '-c', 'import sys; sys.path.insert(0, "src"); from model_training_fixed import TimesFMVN30Finetuner; print("Import OK")'],
++            capture_output=True,
++ text=True,
++            timeout=30
++        )
++
++        # Either imports successfully OR gives clear incompatibility error (not silent failure)
++        if result.returncode != 0:
++            # If import fails, it should be due to dependency incompatibility, not monkey patching
++            assert "float8_e8m0fnu" in result.stderr or "ModuleNotFoundError" in result.stderr, \
++                f"Import failed with unexpected error: {result.stderr}"
++            # Should NOT have monkey patching warnings
++            assert "patch" not in result.stderr.lower(), "Error mentions monkey patching"
++        else:
++            # If import succeeds, verify no warnings
++            assert "Import OK" in result.stdout, "Import did not complete"
++            assert "patch" not in result.stderr.lower(), "Import triggered patching warnings"
++            assert "warning" not in result.stderr.lower(), "Import generated warnings"
++
++    def test_cuda_config_not_at_import_time(self):
++        """Test that CUDA config is not set at import time."""
++        import subprocess
++ import sys
++
++        # Test that CUDA config is not set globally at import
++        result = subprocess.run(
++            [sys.executable, '-c', '''
++import os
++import sys
++
++# Check CUDA env before import
++cuda_before = os.environ.get("PYTORCH_CUDA_ALLOC_CONF")
++
++# Try to read the training script to check for CUDA env setting
++with open("src/model_training_fixed.py", "r") as f:
++    code = f.read()
++
++# Check that os.environ CUDA config is NOT in global scope
++lines = code.split("\\n")
++import_section = []
++main_section = []
++in_main = False
++
++for line in lines:
++    if "def main()" in line:
++        in_main = True
++    if in_main:
++        main_section.append(line)
++    else:
++        import_section.append(line)
++
++import_code = "\\n".join(import_section)
++main_code = "\\n".join(main_section)
++
++# Verify CUDA config is NOT in import section
++assert "PYTORCH_CUDA_ALLOC_CONF" not in import_code or "def main" in import_code, \\
++    "CUDA config found in import section (should be in main() only)"
++
++# Verify CUDA config IS in main section
++assert "PYTORCH_CUDA_ALLOC_CONF" in main_code, \\
++    "CUDA config not found in main() section"
++
++print("CUDA config NOT at import time: OK")
++'''],
++            capture_output=True,
++            text=True,
++            timeout=30
++        )
++
++        assert result.returncode == 0, f"CUDA config check failed: {result.stderr}"
++        assert "CUDA config NOT at import time: OK" in result.stdout
++
++
+ class TestColabPreflightScript:
++    """Test the pre-flight validation script itself."""

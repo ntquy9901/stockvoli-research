@@ -1,0 +1,33 @@
+GOOGLE DRIVE UPLOAD INSTRUCTIONS
+================================
+
+Files to upload to Google Drive → MyDrive → stockvoli-research/
+
+REQUIRED FILES (33 total):
+1. configs/config.yaml
+2. colab_timesfm_training.ipynb  
+3. src/model_training_fixed.py
+4. data/processed/*_processed.csv (30 files)
+
+HOW TO UPLOAD:
+A. Go to drive.google.com
+B. Create folder: stockvoli-research
+C. Drag & drop all files from your project:
+
+From: D:\bmad-projects\stockvoli-research\
+To:   Google Drive → MyDrive → stockvoli-research\
+
+Folder structure should look like:
+stockvoli-research/
+├── configs/
+│   └── config.yaml
+├── data/
+│   └── processed/
+│       ├── ACB_processed.csv
+│       ├── BCM_processed.csv
+│       └── ... (30 files total)
+├── src/
+│   └── model_training_fixed.py
+└── colab_timesfm_training.ipynb
+
+EXPECTED UPLOAD TIME: ~5 minutes (16 MB total)

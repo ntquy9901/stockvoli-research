@@ -1,0 +1,162 @@
+# Vietnamese Stock Volatility Forecasting System Configuration
+# Based on TimesFM and Moirai 2.0 research papers
+
+system:
+  name: "Vietnamese Volatility Forecasting System"
+  version: "1.0.0"
+  device: "cuda"  # or "cpu"
+  random_seed: 42
+
+# Data Configuration
+data:
+  raw_path: "data/raw/prices"
+  processed_path: "data/processed"
+  features_path: "data/features"
+
+  # Vietnamese stocks to process
+  stocks:
+    - ACB
+    - BCM
+    - BID
+    - BVH
+    - CTG
+    - FPT
+    - GAS
+    - GVR
+    - HDB
+    - HPG
+    - MBB
+    - MSN
+    - MWG
+    - NVL
+    - PDR
+    - PLX
+    - POW
+    - SAB
+    - SHB
+    - SSB
+    - SSI
+    - STB
+    - TCB
+    - TPB
+    - VCB
+    - VHM
+    - VIB
+    - VIC
+    - VJC
+    - VNINDEX
+    - VNM
+
+# Feature Engineering Configuration
+features:
+  # Volatility features
+  volatility_windows: [5, 10, 20, 30, 60]
+  context_length: 512  # TimesFM context length
+
+  # Technical indicators
+  technical_indicators:
+    - MA_10
+    - MA_20
+    - MA_50
+    - EMA_12
+    - EMA_26
+    - MACD
+    - RSI
+    - Bollinger_Bands
+    - ATR
+
+  # Vietnamese market specific features
+  vietnamese_market_features:
+    - day_of_week
+    - month_start_end
+    - tet_period
+    - earnings_season
+
+# Incremental Learning Configuration (TimesFM methodology)
+incremental_learning:
+  # Rolling window size (days)
+  window_size: 90
+
+  # Overlap between windows
+  window_overlap: 30
+
+  # Training configuration per window
+  training:
+    batch_size: 32
+    learning_rate: 0.00001
+    optimizer: "AdamW"
+    gradient_clip: 1.0
+    epochs_per_window: 1  # Single epoch per window (TimesFM approach)
+
+  # Memory replay (optional)
+  memory_replay:
+    enabled: false
+    replay_ratio: 0.3  # 30% old data, 70% new data
+    buffer_size: 1000
+
+# Model Configuration
+models:
+  # TimesFM configuration
+  timesfm:
+    model_name: "google/timesfm"
+    pretrained_path: "models/timesfm"
+    context_length: 512
+    prediction_length: 1
+
+  # Moirai 2.0 configuration (for quantile forecasting)
+  moirai:
+    model_name: "Salesforce/moirai-2.0-R-small"
+    pretrained_path: "models/moirai"
+    quantiles: [0.1, 0.5, 0.9]  # 10th, 50th, 90th percentiles
+
+# Statistical Validation Configuration
+validation:
+  # Statistical tests
+  tests:
+    - diebold_mariano
+    - giacomini_white
+
+  # Significance level
+  alpha: 0.05
+
+  # Benchmark models
+  benchmarks:
+    - GARCH
+    - ARIMA
+    - Random_Walk
+
+  # Evaluation metrics
+  metrics:
+    - MAE
+    - RMSE
+    - MAPE
+    - Correlation
+
+# Experiment Tracking
+experiment_tracking:
+  backend: "mlflow"  # or "wandb"
+  experiment_name: "vietnamese_volatility_forecasting"
+  tracking_uri: "mlruns"
+
+# Model Serving Configuration
+serving:
+  framework: "fastapi"
+  host: "0.0.0.0"
+  port: 8000
+  model_versioning: true
+
+# Monitoring Configuration
+monitoring:
+  metrics:
+    - prediction_accuracy
+    - drift_detection
+    - model_confidence
+  alerting:
+    enabled: true
+    threshold: 0.1  # Alert if MAE > 0.1
+
+# Logging Configuration
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "logs/volatility_forecasting.log"

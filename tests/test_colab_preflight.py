@@ -196,6 +196,106 @@ class TestImportValidation:
         assert yaml is not None
 
 
+class TestCleanModuleImport:
+    """Test that module imports cleanly without monkey patching."""
+
+    def test_no_monkey_patching_in_training_module(self):
+        """Test that training module does not contain monkey patching code."""
+        with open('src/model_training_fixed.py', 'r') as f:
+            code = f.read()
+
+        # Check for forbidden monkey patching patterns
+        forbidden_patterns = [
+            'importlib.util.find_spec',  # Monkey patching importlib
+            'patched_find_spec',         # Patched find_spec function
+            'sys.modules[\'bitsandbytes\']',  # Fake module injection
+            'peft_utils.is_bnb_available',  # PEFT monkey patching
+            'float8_e8m0fnu',            # PyTorch compatibility workaround
+        ]
+
+        for pattern in forbidden_patterns:
+            assert pattern not in code, f"Found forbidden monkey patching pattern: {pattern}"
+
+    def test_clean_import_of_training_module(self):
+        """Test that training module imports cleanly OR gives clear incompatibility error."""
+        import subprocess
+        import sys
+
+        # Test import in clean Python environment
+        result = subprocess.run(
+            [sys.executable, '-c', 'import sys; sys.path.insert(0, "src"); from model_training_fixed import TimesFMVN30Finetuner; print("Import OK")'],
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+
+        # Either imports successfully OR gives clear incompatibility error (not silent failure)
+        if result.returncode != 0:
+            # If import fails, it should be due to dependency incompatibility, not monkey patching
+            assert "float8_e8m0fnu" in result.stderr or "ModuleNotFoundError" in result.stderr, \
+                f"Import failed with unexpected error: {result.stderr}"
+            # Should NOT have monkey patching warnings
+            assert "patch" not in result.stderr.lower(), "Error mentions monkey patching"
+        else:
+            # If import succeeds, verify no warnings
+            assert "Import OK" in result.stdout, "Import did not complete"
+            assert "patch" not in result.stderr.lower(), "Import triggered patching warnings"
+            assert "warning" not in result.stderr.lower(), "Import generated warnings"
+
+    def test_cuda_config_not_at_import_time(self):
+        """Test that CUDA config is not set at import time."""
+        import subprocess
+        import sys
+
+        # Test that CUDA config is not set globally at import
+        result = subprocess.run(
+            [sys.executable, '-c', '''
+import os
+import sys
+
+# Check CUDA env before import
+cuda_before = os.environ.get("PYTORCH_CUDA_ALLOC_CONF")
+
+# Try to read the training script to check for CUDA env setting
+with open("src/model_training_fixed.py", "r") as f:
+    code = f.read()
+
+# Check that os.environ CUDA config is NOT in global scope
+lines = code.split("\\n")
+import_section = []
+main_section = []
+in_main = False
+
+for line in lines:
+    if "def main()" in line:
+        in_main = True
+    if in_main:
+        main_section.append(line)
+    else:
+        import_section.append(line)
+
+import_code = "\\n".join(import_section)
+main_code = "\\n".join(main_section)
+
+# Verify CUDA config is NOT in import section
+assert "PYTORCH_CUDA_ALLOC_CONF" not in import_code or "def main" in import_code, \\
+    "CUDA config found in import section (should be in main() only)"
+
+# Verify CUDA config IS in main section
+assert "PYTORCH_CUDA_ALLOC_CONF" in main_code, \\
+    "CUDA config not found in main() section"
+
+print("CUDA config NOT at import time: OK")
+'''],
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+
+        assert result.returncode == 0, f"CUDA config check failed: {result.stderr}"
+        assert "CUDA config NOT at import time: OK" in result.stdout
+
+
 class TestColabPreflightScript:
     """Test the pre-flight validation script itself."""
 

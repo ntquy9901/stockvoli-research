@@ -63,7 +63,6 @@ training:
   batch_size: 1  # VERY SMALL - will accumulate
   gradient_accumulation_steps: 8  # Effective batch = 8
   learning_rate: 0.0001
-  epochs: 100
   optimizer: "SGD"
 
   # Memory optimizations
@@ -103,4 +102,3 @@ experiment_tracking:
   experiments_dir: "experiments"
   models_dir: "models"
   log_level: "INFO"
-  save_every: 10

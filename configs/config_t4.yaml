@@ -1,0 +1,82 @@
+# TimesFM Tesla T4/V100 Optimized Configuration
+# 16GB GPU Memory - Safe and Balanced Settings
+
+# System Configuration
+system:
+  name: "TimesFM VN30 Volatility Forecasting"
+  version: "2.0.0"
+  device: "cuda"
+  random_seed: 42
+  project: "TimesFM-VN30-Finetuning"
+
+# Data Configuration
+data:
+  processed_path: "data/processed"
+  stocks:
+    - ACB BCM BID BVH CTG FPT GAS GVR HDB HPG MBB MSN MWG NVL PDR PLX POW SAB SHB SSB SSI STB TCB TPB VCB VHM VIB VIC VJC VNM
+
+# Dataset Configuration
+dataset:
+  context_length: 64  # Safe for T4 16GB
+  horizon_length: 1
+  samples_per_stock: 100  # Reduced memory overhead
+
+# Model Configuration
+model:
+  model_name: "google/timesfm-2.5-200m-transformers"
+  parameters:
+    context_length: 64
+    prediction_length: 1
+    use_gradient_checkpointing: true  # CRITICAL for T4 16GB!
+    dtype: "bfloat16"
+  lora:
+    r: 4
+    lora_alpha: 8
+    target_modules: "all-linear"
+    lora_dropout: 0.05
+    bias: "none"
+
+# Training Configuration - T4 16GB OPTIMIZED
+training:
+  batch_size: 8  # SAFE for T4 16GB (not too aggressive)
+  gradient_accumulation_steps: 8  # Effective batch = 64
+  learning_rate: 0.0001
+  num_epochs: 100
+  optimizer: "SGD"
+  max_grad_norm: 1.0
+
+  # Memory optimizations
+  num_workers: 2
+  use_mixed_precision: true
+  memory_efficient_attention: true
+  gradient_checkpointing: true  # CRITICAL!
+
+# Incremental Learning
+incremental_learning:
+  window_size: 90
+  overlap: 30
+  epochs_per_window: 1
+
+# Evaluation Configuration
+evaluation:
+  metrics:
+    - QLIKE
+    - R2
+    - RMSE
+    - MSE
+  statistical_tests:
+    - diebold_mariano
+    - giacomini_white
+
+# Experiment Tracking
+experiment_tracking:
+  experiments_dir: "experiments"
+  models_dir: "models"
+  log_level: "INFO"
+  save_every_n_epochs: 10
+
+# Output Configuration
+output:
+  checkpoints_dir: "models/checkpoints"
+  predictions_dir: "experiments/predictions"
+  logs_dir: "experiments/logs"

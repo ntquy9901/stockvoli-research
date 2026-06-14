@@ -1,0 +1,45 @@
+# TimesFM VN30 Fine-tuning Requirements
+# Based on proper TimesFM architecture and pfnet-research methodology
+
+# Core TimesFM and HuggingFace dependencies
+# NOTE: Transformers 5.x requires PyTorch 2.6+ for float8_e8m0fnu support
+# For PyTorch 2.5.x, use transformers 4.x
+transformers>=4.46.0,<5.0.0   # TimesFM 2.5 model support (4.x for PyTorch 2.5 compatibility)
+accelerate>=1.0.0            # GPU acceleration and device mapping
+peft>=0.12.0                  # LoRA adapters for efficient fine-tuning
+
+# PyTorch (install with CUDA support for GPU training)
+# pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+torch>=2.5.0                  # PyTorch deep learning framework
+torchvision>=0.19.0           # Computer vision utilities
+torchaudio>=2.5.0            # Audio utilities (TimesFM dependency)
+
+# Data processing and manipulation
+pandas>=2.0.0                 # Data manipulation and analysis
+numpy>=1.24.0                 # Numerical computing
+scikit-learn>=1.3.0           # Machine learning utilities
+scipy>=1.10.0                 # Scientific computing and statistical tests
+
+# Configuration and data formats
+pyyaml>=6.0                   # YAML configuration file support
+pyarrow>=12.0.0              # Parquet file support (TimesFM data format)
+
+# Experiment tracking and monitoring
+tensorboard>=2.14.0           # Training monitoring (optional)
+tqdm>=4.65.0                  # Progress bars
+
+# Financial data analysis
+yfinance>=0.2.0               # Yahoo Finance data (for additional data)
+
+# Development and testing
+pytest>=7.4.0                 # Testing framework
+pytest-cov>=4.1.0             # Code coverage testing
+
+# Jupyter notebooks (optional)
+jupyter>=1.0.0                # Jupyter notebook support
+notebook>=6.5.0              # Jupyter notebooks
+ipywidgets>=8.0.0             # Interactive widgets
+
+# Utilities
+python-dateutil>=2.8.0        # Date utilities
+pytz>=2023.3                 # Timezone support

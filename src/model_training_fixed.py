@@ -33,51 +33,10 @@ except:
     IN_COLAB = False
 import matplotlib.pyplot as plt
 
-# Workaround for PyTorch compatibility with Transformers 5.10.2
-if not hasattr(torch, 'float8_e8m0fnu'):
-    torch.float8_e8m0fnu = torch.float8_e4m3fn
-
 # HuggingFace Transformers
 from transformers import TimesFm2_5ModelForPrediction
 
-# Monkey-patch importlib to completely disable bitsandbytes detection
-import sys
-import types
-import importlib.util
-
-# Store original find_spec
-original_find_spec = importlib.util.find_spec
-
-# Patch find_spec to return None for bitsandbytes
-def patched_find_spec(name, package=None):
-    if name and 'bitsandbytes' in name:
-        return None  # Report as not found
-    return original_find_spec(name, package)
-
-importlib.util.find_spec = patched_find_spec
-
-# Create minimal fake module for safety
-fake_bnb = types.ModuleType('bitsandbytes')
-fake_bnb.__path__ = []
-fake_bnb.__file__ = '<disabled>'
-sys.modules['bitsandbytes'] = fake_bnb
-
-# CRITICAL: Set CUDA memory management BEFORE any PyTorch operations
-# This prevents memory fragmentation on 8GB GPU
-os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
-
-# Patch PEFT utilities if they exist
-try:
-    import peft.import_utils as peft_utils
-    peft_utils.is_bnb_available = lambda: False
-    if hasattr(peft_utils, 'is_bnb_4bit_available'):
-        peft_utils.is_bnb_4bit_available = lambda: False
-    if hasattr(peft_utils, 'is_bnb_8bit_available'):
-        peft_utils.is_bnb_8bit_available = lambda: False
-except:
-    pass
-
-# Now import PEFT components
+# PEFT components for LoRA adapters
 from peft import LoraConfig, get_peft_model
 
 # Set up logging - Create experiments directory first
@@ -1154,6 +1113,10 @@ class TimesFMVN30Finetuner:
 
 def main():
     """Main execution function"""
+
+    # CRITICAL: Set CUDA memory management BEFORE any PyTorch operations
+    # This prevents memory fragmentation on 8GB GPU
+    os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
 
     # Initialize finetuner
     finetuner = TimesFMVN30Finetuner()
