@@ -32,8 +32,9 @@ def setup_test_logging(config_name: str):
         format='%(asctime)s - %(levelname)s - %(message)s',
         handlers=[
             logging.FileHandler(log_file),
-            logging.StreamHandler()
-        ]
+            logging.StreamHandler(sys.stdout)
+        ],
+        force=True  # Override any existing loggers
     )
     return logging.getLogger(__name__)
 
@@ -64,10 +65,7 @@ def run_batch_size_test(config_file: str, test_name: str):
     # Import training modules
     logger.info("\n[2] Initializing training modules...")
     try:
-        from ml_ds_common_rules.training import TimesFMTrainer
-        from src.data_processing import load_processed_data
-        from src.vn30_dataset import VN30IncrementalDataset
-        from torch.utils.data import DataLoader
+        from src.model_training_fixed import TimesFMVN30Finetuner
         import torch
 
         # Check GPU
@@ -78,44 +76,40 @@ def run_batch_size_test(config_file: str, test_name: str):
             logger.warning("  CUDA not available - using CPU")
             return None
 
-        # Load data
-        logger.info("\n[3] Loading processed data...")
-        data_dir = Path(config['data']['processed_path'])
-        train_data, test_data = load_processed_data(data_dir)
-        logger.info(f"  Train samples: {len(train_data)}")
-        logger.info(f"  Test samples: {len(test_data)}")
+        # Initialize finetuner
+        logger.info("\n[3] Initializing TimesFM finetuner...")
+        finetuner = TimesFMVN30Finetuner(config_file)
 
-        # Create dataset
-        logger.info("\n[4] Creating datasets...")
-        train_dataset = VN30IncrementalDataset(
-            train_data,
-            context_len=config['dataset']['context_length'],
-            horizon_len=config['dataset']['horizon_length'],
-            window_size=config['incremental_learning']['window_size']
-        )
+        # Prepare dataloaders
+        logger.info("\n[4] Preparing dataloaders...")
+        from src.model_training_fixed import create_vn30_dataloaders
+        train_loader, test_loader = create_vn30_dataloaders(config_file)
+        logger.info(f"  Train batches: {len(train_loader)}")
+        logger.info(f"  Test batches: {len(test_loader)}")
 
-        # Create dataloader
-        logger.info("\n[5] Creating dataloader...")
-        train_loader = DataLoader(
-            train_dataset,
-            batch_size=batch_size,
-            shuffle=True,
-            num_workers=config['training']['num_workers'],
-            pin_memory=config['training']['pin_memory'],
-            prefetch_factor=config['training']['prefetch_factor'],
-            persistent_workers=config['training']['persistent_workers']
-        )
-        logger.info(f"  Batches per epoch: {len(train_loader)}")
-
-        # Initialize trainer
-        logger.info("\n[6] Initializing TimesFM trainer...")
-        trainer = TimesFMTrainer(config)
+        # Load model
+        logger.info("\n[5] Loading TimesFM model...")
+        finetuner.load_timesfm_model()
+        finetuner.setup_lora_adapters()
+        logger.info(f"  Model loaded successfully")
 
         # Measure batch processing time
-        logger.info("\n[7] Measuring batch processing performance...")
+        logger.info("\n[6] Measuring batch processing performance...")
         logger.info("  Running 10 batches to measure average time...")
 
         batch_times = []
+
+        # Get first batch
+        batch_iter = iter(train_loader)
+
+        # Measure batch processing time
+        logger.info("\n[5] Measuring batch processing performance...")
+        logger.info("  Running 10 batches to measure average time...")
+
+        batch_times = []
+
+        # Get train loader from finetuner
+        train_loader = finetuner.train_loader
 
         # Get first batch
         batch_iter = iter(train_loader)
@@ -125,15 +119,14 @@ def run_batch_size_test(config_file: str, test_name: str):
                 batch = next(batch_iter)
 
                 # Move to GPU
-                batch = {k: v.to(trainer.device) if isinstance(v, torch.Tensor) else v
-                        for k, v in batch.items()}
+                batch = batch.to(finetuner.device)
 
                 # Measure time
                 start_time = time.time()
 
                 with torch.cuda.amp.autocast(dtype=torch.bfloat16):
                     # Forward pass only (no backward for timing test)
-                    outputs = trainer.model(**batch)
+                    outputs = finetuner.model(batch)
 
                 torch.cuda.synchronize()  # Wait for GPU to finish
                 end_time = time.time()
@@ -144,7 +137,7 @@ def run_batch_size_test(config_file: str, test_name: str):
                 logger.info(f"  Batch {i+1}/10: {batch_time:.2f}ms")
 
             except StopIteration:
-                logger.warning("  Ran out of batches after {i+1} iterations")
+                logger.warning(f"  Ran out of batches after {i+1} iterations")
                 break
             except Exception as e:
                 logger.error(f"  Error processing batch {i+1}: {e}")
@@ -156,7 +149,7 @@ def run_batch_size_test(config_file: str, test_name: str):
             min_time = min(batch_times)
             max_time = max(batch_times)
 
-            logger.info("\n[8] Performance Results:")
+            logger.info("\n[7] Performance Results:")
             logger.info("=" * 70)
             logger.info(f"Average batch time: {avg_time:.2f}ms")
             logger.info(f"Min batch time:     {min_time:.2f}ms")
@@ -193,7 +186,7 @@ def run_batch_size_test(config_file: str, test_name: str):
             return None
 
     except Exception as e:
-        logger.error(f"\n❌ Test failed: {e}")
+        logger.error(f"\n[ERROR] Test failed: {e}")
         import traceback
         traceback.print_exc()
         return None
@@ -202,7 +195,7 @@ def run_batch_size_test(config_file: str, test_name: str):
 def compare_results(results: list):
     """Compare results from different batch size tests"""
     if not results or None in results:
-        print("\n❌ Cannot compare results - some tests failed")
+        print("\n[ERROR] Cannot compare results - some tests failed")
         return
 
     print("\n" + "=" * 70)
@@ -233,7 +226,7 @@ def compare_results(results: list):
 
     # Find optimal
     best_result = max(results, key=lambda x: x['samples_per_second'])
-    print(f"\n✅ RECOMMENDED: {best_result['test_name']}")
+    print(f"\n[RECOMMENDED] {best_result['test_name']}")
     print(f"   Batch size: {best_result['batch_size']}")
     print(f"   Throughput: {best_result['samples_per_second']:.2f} samples/sec")
     print(f"   Epoch time: {best_result['estimated_epoch_time_sec']/60:.2f} minutes")
@@ -242,9 +235,9 @@ def compare_results(results: list):
 def main():
     """Run batch size performance tests"""
     print("\n")
-    print("╔" + "═" * 68 + "╗")
-    print("║" + " " * 10 + "Batch Size Performance Testing - TimesFM VN30" + " " * 19 + "║")
-    print("╚" + "═" * 68 + "╝")
+    print("=" * 70)
+    print(" Batch Size Performance Testing - TimesFM VN30")
+    print("=" * 70)
 
     # Test configurations
     test_configs = [
@@ -255,14 +248,14 @@ def main():
     results = []
 
     for config_file, test_name in test_configs:
-        print(f"\n🧪 Running test: {test_name}")
+        print(f"\n[TEST] Running: {test_name}")
         result = run_batch_size_test(config_file, test_name)
 
         if result:
             results.append(result)
-            print(f"✅ Test completed: {test_name}")
+            print(f"[OK] Test completed: {test_name}")
         else:
-            print(f"❌ Test failed: {test_name}")
+            print(f"[FAIL] Test failed: {test_name}")
 
         # Cleanup GPU memory between tests
         import torch
@@ -285,9 +278,9 @@ def main():
                 'results': results
             }, f, indent=2)
 
-        print(f"\n💾 Results saved to: {results_file}")
+        print(f"\n[SAVE] Results saved to: {results_file}")
     else:
-        print("\n❌ No successful tests to compare")
+        print("\n[ERROR] No successful tests to compare")
 
 
 if __name__ == "__main__":

@@ -63,7 +63,14 @@
       "Bash(xargs wc:*)",
       "Bash(ls _bmad/custom/bmad-quick-dev*)",
       "Bash(grep:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(code:*)",
+      "Bash(mkdir -p /d/huggingface_cache)",
+      "Bash(mkdir -p /d/huggingface_cache/models)",
+      "Read(//d/huggingface_cache/**)",
+      "Bash(export HF_HOME=/d/huggingface_cache)",
+      "Bash(export TRANSFORMERS_CACHE=/d/huggingface_cache/models)",
+      "Bash(export HF_HUB_CACHE=/d/huggingface_cache/hub)"
     ]
   }
 }
