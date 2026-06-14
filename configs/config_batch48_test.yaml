@@ -1,0 +1,93 @@
+# TimesFM Batch Size 48 Test Configuration
+# Testing 4x batch size improvement (from 12 to 48)
+
+# System Configuration
+system:
+  name: "TimesFM VN30 Volatility Forecasting - Batch48 Test"
+  version: "2.0.0"
+  device: "cuda"
+  random_seed: 42
+  project: "TimesFM-VN30-Finetuning"
+
+# Data Configuration
+data:
+  processed_path: "data/processed"
+  stocks:
+    - ACB BCM BID BVH CTG FPT GAS GVR HDB HPG MBB MSN MWG NVL PDR PLX POW SAB SHB SSB SSI STB TCB TPB VCB VHM VIB VIC VJC VNM
+
+# Dataset Configuration
+dataset:
+  context_length: 64
+  horizon_length: 1
+  samples_per_stock: 150
+
+# Model Configuration
+model:
+  model_name: "google/timesfm-2.5-200m-transformers"
+  parameters:
+    context_length: 64
+    prediction_length: 1
+    use_gradient_checkpointing: true
+    dtype: "bfloat16"
+  lora:
+    r: 4
+    lora_alpha: 8
+    target_modules: "all-linear"
+    lora_dropout: 0.05
+    bias: "none"
+
+# Training Configuration - BATCH SIZE 48 TEST
+training:
+  batch_size: 48  # 4x IMPROVEMENT (from 12 to 48)
+  gradient_accumulation_steps: 1  # No accumulation needed with larger batch
+  learning_rate: 0.0001
+  num_epochs: 100
+  optimizer: "SGD"
+  max_grad_norm: 1.0
+
+  # Memory optimizations
+  num_workers: 6
+  pin_memory: true
+  prefetch_factor: 3
+  persistent_workers: true
+  use_mixed_precision: true
+  memory_efficient_attention: true
+  gradient_checkpointing: true
+
+# Incremental Learning
+incremental_learning:
+  window_size: 90
+  overlap: 30
+  epochs_per_window: 1
+
+# Evaluation Configuration
+evaluation:
+  metrics:
+    - QLIKE
+    - R2
+    - RMSE
+    - MSE
+  statistical_tests:
+    - diebold_mariano
+    - giacomini_white
+
+# Experiment Tracking
+experiment_tracking:
+  experiments_dir: "experiments/batch48_test"
+  models_dir: "models/batch48_test"
+  log_level: "INFO"
+  save_every_n_epochs: 10
+
+# Output Configuration
+output:
+  checkpoints_dir: "models/batch48_test/checkpoints"
+  predictions_dir: "experiments/batch48_test/predictions"
+  logs_dir: "experiments/batch48_test/logs"
+
+# Test Metadata
+test_config:
+  test_name: "batch_size_48"
+  description: "Testing 4x batch size improvement (12→48)"
+  expected_speedup: "3-4x faster"
+  expected_batch_time: "0.6-0.8 seconds"
+  effective_batch_size: 48
