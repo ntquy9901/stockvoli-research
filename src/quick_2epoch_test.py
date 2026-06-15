@@ -50,34 +50,69 @@ def analyze_train_val_periods(train_loader, test_loader, feature_type='RV_20'):
     logging.info(f"Feature: {feature_type}")
     logging.info("=" * 70)
 
-    # Extract data from loaders
+    # Extract data from loaders (sample fewer batches for speed)
     train_data = []
     for batch in train_loader:
         train_data.append(batch)
-        if len(train_data) >= 100:  # Sample first 100 batches
+        if len(train_data) >= 10:  # Sample first 10 batches (reduced from 100)
             break
 
     val_data = []
     for batch in test_loader:
         val_data.append(batch)
-        if len(val_data) >= 100:  # Sample first 100 batches
+        if len(val_data) >= 10:  # Sample first 10 batches (reduced from 100)
             break
 
-    # Convert to numpy for analysis
+    # Convert to numpy for analysis (FIXED: Handle dict batches correctly)
     train_values = []
     for batch in train_data:
-        if isinstance(batch, (list, tuple)):
-            batch = batch[0]  # Get features if [features, labels]
-        train_values.extend(batch.flatten().numpy())
+        if isinstance(batch, dict):
+            # TimesFM dataloader returns dict with 'context' and 'ground_truth' keys
+            context_data = batch.get('context', None)
+            if context_data is not None:
+                # Convert tensor to numpy and flatten
+                if hasattr(context_data, 'numpy'):
+                    train_values.extend(context_data.numpy().flatten())
+                elif hasattr(context_data, 'flatten'):
+                    train_values.extend(context_data.flatten())
+        elif isinstance(batch, (list, tuple)):
+            # Handle list/tuple batches
+            batch_item = batch[0] if len(batch) > 0 else batch
+            if hasattr(batch_item, 'numpy'):
+                train_values.extend(batch_item.numpy().flatten())
+            elif hasattr(batch_item, 'flatten'):
+                train_values.extend(batch_item.flatten())
 
     val_values = []
     for batch in val_data:
-        if isinstance(batch, (list, tuple)):
-            batch = batch[0]
-        val_values.extend(batch.flatten().numpy())
+        if isinstance(batch, dict):
+            # TimesFM dataloader returns dict with 'context' and 'ground_truth' keys
+            context_data = batch.get('context', None)
+            if context_data is not None:
+                # Convert tensor to numpy and flatten
+                if hasattr(context_data, 'numpy'):
+                    val_values.extend(context_data.numpy().flatten())
+                elif hasattr(context_data, 'flatten'):
+                    val_values.extend(context_data.flatten())
+        elif isinstance(batch, (list, tuple)):
+            # Handle list/tuple batches
+            batch_item = batch[0] if len(batch) > 0 else batch
+            if hasattr(batch_item, 'numpy'):
+                val_values.extend(batch_item.numpy().flatten())
+            elif hasattr(batch_item, 'flatten'):
+                val_values.extend(batch_item.flatten())
 
     train_values = np.array(train_values)
     val_values = np.array(val_values)
+
+    # Check if we got any data
+    if len(train_values) == 0 or len(val_values) == 0:
+        logging.warning("Could not extract data from dataloaders for diagnostic analysis")
+        logging.warning("Skipping diagnostic analysis - training will continue")
+        return {
+            'status': 'insufficient_data',
+            'error': 'Could not extract data from batches'
+        }
 
     # Remove NaN/Inf values
     train_values = train_values[np.isfinite(train_values)]
