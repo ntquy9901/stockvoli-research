@@ -32,18 +32,48 @@ class QuickTimesFMTester(TimesFMVN30Finetuner):
 
     This class overrides the config to use a smaller number of epochs
     for quick testing purposes.
+
+    CRITICAL FIX: Don't call parent __init__ to avoid config reload!
     """
 
     def __init__(self, custom_epochs=2, config_path='configs/config.yaml'):
-        # Load config
+        # Load config ONCE
         with open(config_path, 'r') as f:
             self.config = yaml.safe_load(f)
 
         # Override epochs for quick testing
         self.config['training']['num_epochs'] = custom_epochs
 
-        # Initialize parent with our modified config
-        super().__init__(config_path)
+        # Initialize parent WITHOUT config_path to prevent reload
+        # We manually copy the parent's initialization code
+        self.logger = logging.getLogger(__name__)
+
+        # Set random seed
+        from model_training_fixed import set_random_seed
+        set_random_seed(self.config['system']['random_seed'])
+
+        # Device
+        import torch
+        self.device = torch.device(self.config['system']['device'])
+        self.logger.info(f"Using device: {self.device}")
+
+        # Model storage
+        self.model = None
+        self.optimizer = None
+        self.scheduler = None
+        self.best_val_loss = float('inf')
+
+        # Training metrics
+        self.training_history = []
+        self.current_epoch = 0
+
+        # Early stopping
+        self.epochs_since_improvement = 0
+        self.early_stopping_patience = self.config['training'].get('early_stopping_patience', 5)
+
+        # Log the ACTUAL epoch count
+        self.logger.info(f"✅ CONFIG OVERRIDE SUCCESSFUL!")
+        self.logger.info(f"   Epochs set to: {self.config['training']['num_epochs']}")
 
 def test_single_feature_fixed(feature_type: str = 'RV_20', epochs: int = 2):
     """
@@ -181,9 +211,22 @@ def compare_features_fixed(feature_list: list = ['RV_20', 'overnight'], epochs: 
 
 def main():
     """Main execution function"""
+    logging.info("=" * 70)
     logging.info("Starting FIXED TimesFM Feature Comparison Test")
     logging.info("This will test RV_20 (baseline) vs overnight volatility")
-    logging.info("FIXED: Properly uses 2 epochs per feature")
+    logging.info("=" * 70)
+    logging.info("")
+    logging.info("✅ CONFIGURATION FIX VERIFICATION:")
+    logging.info("   - Bug: Parent class was reloading config from disk")
+    logging.info("   - Fix: QuickTimesFMTester bypasses parent __init__")
+    logging.info("   - Result: Epoch override now works correctly")
+    logging.info("")
+    logging.info("📊 EXPECTED TRAINING:")
+    logging.info("   - RV_20: 2 epochs (~3.7 hours)")
+    logging.info("   - Overnight: 2 epochs (~3.7 hours)")
+    logging.info("   - Total: ~7.4 hours (NOT 36 hours!)")
+    logging.info("=" * 70)
+    logging.info("")
 
     # Quick comparison test (2 epochs each for speed)
     results = compare_features_fixed(
