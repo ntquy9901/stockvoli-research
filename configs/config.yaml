@@ -45,7 +45,7 @@ training:
   num_epochs: 100
   optimizer: "SGD"
   max_grad_norm: 1.0
-  early_stopping_patience: 20  # Increased from 5 - Allow more epochs for convergence
+  early_stopping_patience: 10  # Increased from 5 - Allow more epochs for convergence
   # early_stopping_patience: 999  # Uncomment to DISABLE early stopping (train full num_epochs)
 
   # Memory optimizations - OPTIMIZED for 53GB system RAM
