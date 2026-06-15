@@ -1,0 +1,57 @@
+# SIMPLE COLAB COMMANDS
+# Copy and paste these commands into Google Colab cells
+
+# CELL 1: Check GPU
+import torch
+print(f"GPU Available: {torch.cuda.is_available()}")
+if torch.cuda.is_available():
+    print(f"GPU Name: {torch.cuda.get_device_name(0)}")
+    print(f"GPU Memory: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB")
+
+# CELL 2: Clone repository
+!git clone https://github.com/ntquy9901/stockvoli-research.git
+%cd stockvoli-research
+!ls -la
+
+# CELL 3: Install dependencies
+!pip install torch transformers peft datasets pandas numpy scikit-learn yaml tqdm
+
+# CELL 4: Verify data
+import pandas as pd
+import os
+sample_file = 'data/processed/ACB_processed.csv'
+if os.path.exists(sample_file):
+    df = pd.read_csv(sample_file)
+    print(f"Columns: {list(df.columns)}")
+    print(f"Shape: {df.shape}")
+    print(f"OHLC features: overnight={df['overnight'].notna().sum()}, parkinson={df['parkinson'].notna().sum()}")
+
+# CELL 5: Run test
+print("Starting TimesFM VN30 OHLC Comparison Test...")
+print("Testing RV_20 (baseline) vs overnight volatility")
+print("Expected time: ~7.4 hours (2 epochs each)")
+!python src/quick_2epoch_test.py
+
+# CELL 6: Check results
+import json
+import os
+results_file = 'experiments/feature_comparison_results_fixed.json'
+if os.path.exists(results_file):
+    with open(results_file, 'r') as f:
+        results = json.load(f)
+    print("\n" + "="*50)
+    print("FINAL RESULTS")
+    print("="*50)
+    if 'RV_20' in results and 'overnight' in results:
+        rv20 = results['RV_20']['best_val_loss']
+        overnight = results['overnight']['best_val_loss']
+        improvement = (rv20 - overnight) / rv20 * 100
+        print(f"RV_20 (baseline): {rv20:.6f}")
+        print(f"Overnight: {overnight:.6f}")
+        print(f"Improvement: {improvement:+.1f}%")
+        if improvement > 0:
+            print("SUCCESS: Overnight volatility is better!")
+        else:
+            print("Baseline still better")
+else:
+    print(f"Results not found: {results_file}")
