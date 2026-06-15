@@ -1,4 +1,4 @@
-# SIMPLE COLAB COMMANDS - UPDATED WITH TORCHAO FIX
+# SIMPLE COLAB COMMANDS - COMPLETE VERSION (All G4 notebook elements)
 # Copy and paste these commands into Google Colab cells
 
 # CELL 1: Check GPU
@@ -13,23 +13,32 @@ if torch.cuda.is_available():
     if gpu_mem > 20:
         print("G4/L4 GPU detected - Perfect for TimesFM 2.5!")
 
-# CELL 2: Setup memory optimization
-import os
-os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
-print("Memory optimization enabled")
-
-# CELL 3: Clone repository
+# CELL 2: Clone repository and setup directories
 !git clone https://github.com/ntquy9901/stockvoli-research.git
-%cd stockvoli-research
+
+import os
+os.chdir('stockvoli-research')
 !git pull origin master
 !ls -la
 
-# CELL 4: CRITICAL - Fix torchao version conflict
-# Error: Found an incompatible version of torchao. Found version 0.10.0, but only versions above 0.16.0 are supported
-!pip uninstall -y torchao
-print("Torchao uninstalled to fix version conflict")
+# CRITICAL: Create necessary directories (same as G4 notebook)
+!mkdir -p experiments models
 
-# CELL 5: Verify imports
+print(f"Working directory: {os.getcwd()}")
+print("Directories created: experiments, models")
+
+# CELL 3: Fix torchao conflict and setup memory
+# CRITICAL: Uninstall problematic torchao first
+!pip uninstall -y torchao
+
+# Setup memory optimization (same as G4 notebook)
+import os
+os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
+
+print("Torchao uninstalled to fix version conflict")
+print("Memory optimization enabled")
+
+# CELL 4: Verify imports
 import transformers
 import peft
 import torch
@@ -41,26 +50,53 @@ from tqdm import tqdm
 print("All packages imported successfully!")
 print(f"transformers: {transformers.__version__}")
 print(f"torch: {torch.__version__}")
+print(f"pandas: {pd.__version__}")
+print(f"numpy: {np.__version__}")
+
+# CELL 5: Load and verify config
+import yaml
+from pathlib import Path
+
+with open('configs/config.yaml', 'r') as f:
+    config = yaml.safe_load(f)
+
+print("Config loaded successfully!")
+print("\nG4/L4 Optimized Settings:")
+print(f"  - Context length: {config['dataset']['context_length']}")
+print(f"  - Batch size: {config['training']['batch_size']}")
+print(f"  - Gradient accumulation: {config['training']['gradient_accumulation_steps']}")
+print(f"  - Workers: {config['training']['num_workers']}")
+print(f"  - Learning rate: {config['training']['learning_rate']}")
+print(f"  - Optimizer: {config['training']['optimizer']}")
+print(f"  - Epochs: {config['training']['num_epochs']} (will override to 2)")
+
+print("\nTest Configuration:")
+print("  - Baseline: RV_20 feature (2 epochs)")
+print("  - New Feature: Overnight volatility (2 epochs)")
+print("  - Expected time: ~7.4 hours total")
 
 # CELL 6: Verify data
 import pandas as pd
 from pathlib import Path
 
 data_dir = Path('data/processed')
-files = list(data_dir.glob('*_processed.csv'))
-print(f"Found {len(files)} processed stock files")
+if data_dir.exists():
+    files = list(data_dir.glob('*_processed.csv'))
+    print(f"Data files: {len(files)} stocks found")
 
-sample_file = files[0]
-df = pd.read_csv(sample_file)
-print(f"Sample: {sample_file.name}")
-print(f"Shape: {df.shape}")
+    sample_file = files[0]
+    df = pd.read_csv(sample_file)
+    print(f"\nSample: {sample_file.name}")
+    print(f"Shape: {df.shape}")
 
-ohlc_features = ['overnight', 'parkinson', 'gk', 'close_to_close']
-print(f"OHLC Features:")
-for feat in ohlc_features:
-    if feat in df.columns:
-        count = df[feat].notna().sum()
-        print(f"  {feat}: {count} observations")
+    ohlc_features = ['overnight', 'parkinson', 'gk', 'close_to_close']
+    print(f"\nOHLC Features:")
+    for feat in ohlc_features:
+        if feat in df.columns:
+            count = df[feat].notna().sum()
+            print(f"  {feat}: {count} observations")
+else:
+    print(f"Data directory not found: {data_dir}")
 
 # CELL 7: Run test
 print("="*70)
@@ -70,11 +106,26 @@ print("\nTesting:")
 print("  1. RV_20 (baseline) - 2 epochs (~3.7 hours)")
 print("  2. Overnight volatility - 2 epochs (~3.7 hours)")
 print("\nExpected improvement: 10-25% over baseline")
+print("Start time:", pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S'))
 print("="*70)
 print()
 !python src/quick_2epoch_test.py
 
-# CELL 8: Check results
+# CELL 8: Monitor training progress (OPTIONAL - Run while training)
+print("Training logs:")
+!tail -20 experiments/quick_comparison.log
+
+print("\nGPU utilization:")
+!nvidia-smi --query-gpu=utilization.gpu,memory.used,memory.total --format=csv
+
+# Check GPU memory usage
+import torch
+if torch.cuda.is_available():
+    allocated = torch.cuda.memory_allocated(0) / 1e9
+    total = torch.cuda.get_device_properties(0).total_memory / 1e9
+    print(f"\nGPU Memory: {allocated:.1f}/{total:.1f} GB ({allocated/total*100:.1f}% utilization)")
+
+# CELL 9: Check results
 import json
 from pathlib import Path
 
@@ -92,13 +143,16 @@ if results_file.exists():
         overnight = results['overnight']['best_val_loss']
         improvement = (rv20 - overnight) / rv20 * 100
 
-        print(f"\nRV_20 (baseline):      {rv20:.6f}")
-        print(f"Overnight volatility:   {overnight:.6f}")
-        print(f"Improvement:            {improvement:+.1f}%")
+        print(f"\nPerformance Comparison:")
+        print(f"  RV_20 (baseline):      {rv20:.6f}")
+        print(f"  Overnight volatility:   {overnight:.6f}")
+        print(f"  Improvement:            {improvement:+.1f}%")
 
         if improvement > 0:
             print("\nSUCCESS: Overnight volatility is better!")
             print(f"Improved forecasting by {improvement:.1f}%")
+            if improvement >= 10:
+                print(f"EXCEEDS CONSERVATIVE ESTIMATE!")
         else:
             print("\nBaseline still better")
 else:
