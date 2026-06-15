@@ -70,7 +70,15 @@
       "Read(//d/huggingface_cache/**)",
       "Bash(export HF_HOME=/d/huggingface_cache)",
       "Bash(export TRANSFORMERS_CACHE=/d/huggingface_cache/models)",
-      "Bash(export HF_HUB_CACHE=/d/huggingface_cache/hub)"
+      "Bash(export HF_HUB_CACHE=/d/huggingface_cache/hub)",
+      "Bash(cat)",
+      "Read(//tmp/**)",
+      "Bash(/tmp/check_loss_trend.sh)",
+      "Bash(pdftotext:*)",
+      "Bash(zip_processed_data.bat:*)",
+      "Bash(cmd.exe:*)",
+      "Bash(powershell:*)",
+      "Bash(git remote:*)"
     ]
   }
 }
