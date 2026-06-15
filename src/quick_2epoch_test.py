@@ -239,7 +239,7 @@ def analyze_training_progress(training_history):
     Analyze training progress to explain loss patterns
 
     Args:
-        training_history: List of dicts with 'train_loss' and 'val_loss'
+        training_history: List of dicts with 'train_metrics' and 'val_metrics'
 
     Returns:
         dict: Analysis of training patterns
@@ -252,9 +252,15 @@ def analyze_training_progress(training_history):
     logging.info("TRAINING PROGRESS ANALYSIS")
     logging.info("=" * 70)
 
-    # Extract losses
-    train_losses = [epoch['train_loss'] for epoch in training_history]
-    val_losses = [epoch['val_loss'] for epoch in training_history]
+    # Extract losses from nested structure
+    train_losses = [epoch['train_metrics']['loss'] for epoch in training_history]
+    val_losses = [epoch['val_metrics']['val_loss'] for epoch in training_history]
+
+    # NEW: Extract QLIKE if available
+    val_qlikes = None
+    if 'val_qlike' in training_history[0]['val_metrics']:
+        val_qlikes = [epoch['val_metrics']['val_qlike'] for epoch in training_history
+                      if epoch['val_metrics'].get('val_qlike', float('inf')) != float('inf')]
 
     # Calculate trends
     train_trend = (train_losses[-1] - train_losses[0]) / len(train_losses)
@@ -268,13 +274,31 @@ def analyze_training_progress(training_history):
     logging.info(f"Total epochs: {total_epochs}")
     logging.info(f"Epochs where Train > Val: {train_gt_val_epochs} ({train_gt_val_pct:.1f}%)")
     logging.info("")
-    logging.info("LOSS TRENDS:")
+    logging.info("MSE LOSS TRENDS (Model Optimization):")
     logging.info(f"  Train: {train_losses[0]:.6f} → {train_losses[-1]:.6f} (trend: {train_trend:+.6f}/epoch)")
     logging.info(f"  Val:   {val_losses[0]:.6f} → {val_losses[-1]:.6f} (trend: {val_trend:+.6f}/epoch)")
 
+    # NEW: QLIKE analysis
+    if val_qlikes and len(val_qlikes) > 0:
+        qlike_trend = (val_qlikes[-1] - val_qlikes[0]) / len(val_qlikes)
+        logging.info("")
+        logging.info("QLIKE METRIC TRENDS (Volatility Evaluation):")
+        logging.info(f"  Val QLIKE: {val_qlikes[0]:.6f} → {val_qlikes[-1]:.6f} (trend: {qlike_trend:+.6f}/epoch)")
+        logging.info("")
+        logging.info("QLIKE INTERPRETATION:")
+        if qlike_trend < 0:
+            logging.info("  ✅ QLIKE decreasing → Volatility forecasts improving")
+            logging.info("     Lower QLIKE = Better volatility predictions")
+        else:
+            logging.warning("  ⚠️  QLIKE increasing → Volatility forecasts degrading")
+            logging.warning("     Model may be overfitting to MSE instead of volatility quality")
+    else:
+        logging.info("")
+        logging.info("Note: QLIKE metrics not available (check model prediction outputs)")
+
     # Analyze pattern
     logging.info("")
-    logging.info("PATTERN ANALYSIS:")
+    logging.info("MSE LOSS PATTERN ANALYSIS:")
 
     if train_gt_val_pct >= 50:
         logging.info(f"  ⚠️  Train Loss > Val Loss in {train_gt_val_pct:.1f}% of epochs")
@@ -293,25 +317,43 @@ def analyze_training_progress(training_history):
 
         logging.info("")
         logging.info("RECENT CONVERGENCE (last 5 epochs):")
-        logging.info(f"  Train trend: {recent_train_trend:+.6f}/epoch")
-        logging.info(f"  Val trend:   {recent_val_trend:+.6f}/epoch")
+        logging.info(f"  MSE Train trend: {recent_train_trend:+.6f}/epoch")
+        logging.info(f"  MSE Val trend:   {recent_val_trend:+.6f}/epoch")
+
+        # NEW: QLIKE convergence check
+        if val_qlikes and len(val_qlikes) >= 5:
+            recent_qlike_trend = (val_qlikes[-1] - val_qlikes[-5]) / 5
+            logging.info(f"  QLIKE trend:    {recent_qlike_trend:+.6f}/epoch")
+
+            if recent_qlike_trend > 0:
+                logging.warning("  ⚠️  QLIKE INCREASING - Volatility forecasts getting worse!")
+                logging.warning("     Model optimizing MSE but not volatility quality")
+            else:
+                logging.info("  ✅ QLIKE decreasing - Volatility predictions improving")
 
         if recent_val_trend > 0:
-            logging.warning("  ⚠️  Validation loss INCREASING - possible overfitting!")
+            logging.warning("  ⚠️  MSE Validation loss INCREASING - possible overfitting!")
             logging.warning("     Consider early stopping or more regularization")
         else:
-            logging.info("  ✅ Both losses decreasing - model still learning")
+            logging.info("  ✅ Both MSE losses decreasing - model still learning")
 
     logging.info("=" * 70)
     logging.info("")
 
-    return {
+    # NEW: Return QLIKE data if available
+    result = {
         'train_gt_val_pct': train_gt_val_pct,
         'train_trend': train_trend,
         'val_trend': val_trend,
         'train_losses': train_losses,
         'val_losses': val_losses
     }
+
+    if val_qlikes and len(val_qlikes) > 0:
+        result['val_qlikes'] = val_qlikes
+        result['qlike_trend'] = (val_qlikes[-1] - val_qlikes[0]) / len(val_qlikes)
+
+    return result
 
 class QuickTimesFMTester(TimesFMVN30Finetuner):
     """
@@ -487,14 +529,33 @@ def compare_features_fixed(feature_list: list = ['RV_20', 'overnight'], epochs: 
     baseline_result = all_results.get('RV_20', {})
     baseline_loss = baseline_result.get('best_val_loss', float('inf'))
 
+    # NEW: Get QLIKE from progress analysis
+    baseline_qlike = None
+    if 'progress_analysis' in baseline_result and 'val_qlikes' in baseline_result['progress_analysis']:
+        qlikes = baseline_result['progress_analysis']['val_qlikes']
+        baseline_qlike = qlikes[-1] if qlikes else None
+
     for feature_type, result in all_results.items():
         if result['status'] == 'success':
             loss = result['best_val_loss']
+
+            # NEW: Get QLIKE for this feature
+            feature_qlike = None
+            if 'progress_analysis' in result and 'val_qlikes' in result['progress_analysis']:
+                qlikes = result['progress_analysis']['val_qlikes']
+                feature_qlike = qlikes[-1] if qlikes else None
+
             if feature_type != 'RV_20' and baseline_loss != float('inf'):
                 improvement = (baseline_loss - loss) / baseline_loss * 100
-                logging.info(f"{feature_type}: {loss:.6f} ({improvement:+.1f}% vs baseline)")
+
+                # NEW: QLIKE comparison
+                qlike_str = f", QLIKE: {feature_qlike:.6f}" if feature_qlike else ""
+                baseline_qlike_str = f" (QLIKE: {baseline_qlike:.6f})" if baseline_qlike else ""
+
+                logging.info(f"{feature_type}: Loss={loss:.6f} ({improvement:+.1f}% vs baseline){qlike_str}")
             else:
-                logging.info(f"{feature_type}: {loss:.6f} (baseline)")
+                baseline_qlike_str = f" (QLIKE: {baseline_qlike:.6f})" if baseline_qlike else ""
+                logging.info(f"{feature_type}: Loss={loss:.6f}{baseline_qlike_str} (baseline)")
         else:
             logging.info(f"{feature_type}: FAILED - {result.get('error', 'Unknown error')}")
 
@@ -541,17 +602,54 @@ def main():
             overnight_loss = results['overnight']['best_val_loss']
             improvement = (rv20_loss - overnight_loss) / rv20_loss * 100
 
+            # NEW: Get QLIKE metrics
+            rv20_qlike = None
+            overnight_qlike = None
+            if 'progress_analysis' in results['RV_20'] and 'val_qlikes' in results['RV_20']['progress_analysis']:
+                qlikes = results['RV_20']['progress_analysis']['val_qlikes']
+                rv20_qlike = qlikes[-1] if qlikes else None
+            if 'progress_analysis' in results['overnight'] and 'val_qlikes' in results['overnight']['progress_analysis']:
+                qlikes = results['overnight']['progress_analysis']['val_qlikes']
+                overnight_qlike = qlikes[-1] if qlikes else None
+
             logging.info("\n" + "=" * 70)
             logging.info("[FINAL RESULT]")
             logging.info("=" * 70)
-            logging.info(f"RV_20 baseline loss: {rv20_loss:.6f}")
-            logging.info(f"Overnight volatility loss: {overnight_loss:.6f}")
-            logging.info(f"Improvement: {improvement:+.1f}%")
+            logging.info("MSE Loss (Model Optimization):")
+            logging.info(f"  RV_20 baseline:        {rv20_loss:.6f}")
+            logging.info(f"  Overnight volatility:   {overnight_loss:.6f}")
+            logging.info(f"  Improvement:            {improvement:+.1f}%")
 
-            if improvement > 0:
-                logging.info("✅ OVERNIGHT VOLATILITY IS BETTER!")
+            # NEW: QLIKE comparison
+            if rv20_qlike and overnight_qlike:
+                qlike_improvement = (rv20_qlike - overnight_qlike) / rv20_qlike * 100
+                logging.info("")
+                logging.info("QLIKE Metric (Volatility Quality):")
+                logging.info(f"  RV_20 baseline:        {rv20_qlike:.6f}")
+                logging.info(f"  Overnight volatility:   {overnight_qlike:.6f}")
+                logging.info(f"  Improvement:            {qlike_improvement:+.1f}%")
+
+                if improvement > 0 and qlike_improvement > 0:
+                    logging.info("")
+                    logging.info("✅ OVERNIGHT VOLATILITY IS BETTER!")
+                    logging.info("   ✅ Lower MSE loss (better model fit)")
+                    logging.info("   ✅ Lower QLIKE (better volatility forecasts)")
+                elif improvement > 0 and qlike_improvement <= 0:
+                    logging.info("")
+                    logging.info("⚠️  MIXED RESULTS:")
+                    logging.info("   ✅ Lower MSE loss but worse QLIKE")
+                    logging.info("   ⚠️  Model fits better but volatility quality may not improve")
+                    logging.info("   → Consider optimizing for QLIKE directly")
+                else:
+                    logging.info("")
+                    logging.info("❌ BASELINE RV_20 IS STILL BETTER")
             else:
-                logging.info("❌ BASELINE RV_20 IS STILL BETTER")
+                logging.info("")
+                logging.info("Note: QLIKE metrics not available (check model prediction outputs)")
+                if improvement > 0:
+                    logging.info("✅ OVERNIGHT VOLATILITY IS BETTER! (based on MSE loss)")
+                else:
+                    logging.info("❌ BASELINE RV_20 IS STILL BETTER")
 
     return 0
 

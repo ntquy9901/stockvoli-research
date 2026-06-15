@@ -830,17 +830,21 @@ class TimesFMVN30Finetuner:
 
     def validate_model(self, test_loader: DataLoader) -> Dict[str, float]:
         """
-        Validate model on test set
+        Validate model on test set with QLIKE evaluation
 
         Args:
             test_loader: Test data loader
 
         Returns:
-            Dictionary with validation metrics
+            Dictionary with validation metrics including QLIKE
         """
         self.model.eval()
         val_loss = 0.0
         val_batches = 0
+
+        # NEW: Collect predictions and actuals for QLIKE calculation
+        all_predictions = []
+        all_actuals = []
 
         with torch.no_grad():
             for batch in test_loader:
@@ -868,6 +872,16 @@ class TimesFMVN30Finetuner:
                     val_loss += outputs.loss.item()
                     val_batches += 1
 
+                    # NEW: Collect predictions and actuals for QLIKE
+                    # outputs.prediction_outputs contains the model's predictions
+                    if hasattr(outputs, 'prediction_outputs') and outputs.prediction_outputs is not None:
+                        predictions = outputs.prediction_outputs.cpu().numpy()
+                        actuals = ground_truth_batch.cpu().numpy()
+
+                        # Flatten to 1D arrays (handling batch and sequence dimensions)
+                        all_predictions.extend(predictions.flatten())
+                        all_actuals.extend(actuals.flatten())
+
                     # SIMPLIFIED: Only cleanup outputs
                     del outputs
 
@@ -877,9 +891,31 @@ class TimesFMVN30Finetuner:
 
         avg_val_loss = val_loss / max(val_batches, 1)
 
+        # NEW: Calculate QLIKE metric
+        val_qlike = float('inf')  # Default if no predictions collected
+        if len(all_predictions) > 0 and len(all_actuals) > 0:
+            try:
+                # Convert to numpy arrays
+                predictions_arr = np.array(all_predictions)
+                actuals_arr = np.array(all_actuals)
+
+                # Calculate QLIKE: mean(actual/pred + log(pred) - 1)
+                # Prevent division by zero and log of zero
+                predictions_safe = np.maximum(predictions_arr, 1e-8)
+                actuals_safe = np.maximum(actuals_arr, 1e-8)
+
+                val_qlike = np.mean(actuals_safe / predictions_safe + np.log(predictions_safe) - 1)
+
+                self.logger.debug(f"QLIKE calculated on {len(predictions_arr)} samples")
+            except Exception as e:
+                self.logger.warning(f"QLIKE calculation failed: {e}")
+                val_qlike = float('inf')
+
         return {
             'val_loss': avg_val_loss,
-            'num_batches': val_batches
+            'val_qlike': val_qlike,
+            'num_batches': val_batches,
+            'num_samples': len(all_predictions)
         }
 
     def train_model(self, train_loader: DataLoader = None,
@@ -946,8 +982,12 @@ class TimesFMVN30Finetuner:
                 self.logger.info("=" * 70)
                 self.logger.info(f"EPOCH {epoch+1}/{num_epochs} COMPLETE")
                 self.logger.info("=" * 70)
-                self.logger.info(f"Train Loss: {train_metrics['loss']:.4f}")
-                self.logger.info(f"Val Loss: {val_metrics['val_loss']:.4f}")
+                self.logger.info(f"Train Loss: {train_metrics['loss']:.6f}")
+                self.logger.info(f"Val Loss:   {val_metrics['val_loss']:.6f}")
+
+                # NEW: Log QLIKE metric (volatility-specific evaluation)
+                if 'val_qlike' in val_metrics and val_metrics['val_qlike'] != float('inf'):
+                    self.logger.info(f"Val QLIKE:  {val_metrics['val_qlike']:.6f} ⭐ Volatility Metric")
 
                 # Store training history
                 epoch_log = {
