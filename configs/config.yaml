@@ -11,6 +11,7 @@ system:
 
 # Data Configuration
 data:
+  raw_path: "data/raw/prices"
   processed_path: "data/processed"
   stocks:
     - ACB BCM BID BVH CTG FPT GAS GVR HDB HPG MBB MSN MWG NVL PDR PLX POW SAB SHB SSB SSI STB TCB TPB VCB VHM VIB VIC VJC VNM

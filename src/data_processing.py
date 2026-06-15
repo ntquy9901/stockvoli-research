@@ -75,6 +75,9 @@ class VN30FinancialDataProcessor:
         # Step 3: Add Vietnamese market features
         df = self._add_vietnamese_market_features(df)
 
+        # Step 3.5: Add OHLC range estimators (G7 paper)
+        df = self._add_ohlc_features(df)
+
         # Step 4: Apply financial clipping
         df = self._apply_financial_clipping(df)
 
@@ -155,6 +158,45 @@ class VN30FinancialDataProcessor:
 
         return df
 
+    def _add_ohlc_features(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Add OHLC-based volatility estimators from G7 paper research
+
+        Paper findings: "Do extreme range estimators improve realized volatility forecasts?"
+        - Overnight volatility: Most consistent performer across G7 markets
+        - Parkinson estimator: Good performer for multiple markets
+        - Garman-Klass estimator: Good performer for multiple markets
+
+        Vietnamese market application:
+        - Overnight effects may capture TET holiday information
+        - Range estimators capture intraday volatility patterns
+        - All features work as univariate time series for TimesFM
+        """
+        # Overnight volatility (paper's #1 performer)
+        # Formula: (ln(Ot/Ct-1))² - captures overnight information accumulation
+        df['overnight'] = np.log(df['open'] / df['close'].shift(1)) ** 2
+        df['overnight'].fillna(0, inplace=True)
+
+        # Parkinson estimator (paper's #2 performer)
+        # Formula: (1/(4ln2)) × (ln(Ht/Lt))² - uses high-low range
+        df['parkinson'] = (1 / (4 * np.log(2))) * (np.log(df['high'] / df['low']) ** 2)
+        df['parkinson'].fillna(0, inplace=True)
+
+        # Garman-Klass estimator (paper's #3 performer)
+        # Formula: 0.5*(H/L)² - (2ln2-1)*(C/O)² - incorporates drift
+        high_low = np.log(df['high'] / df['low']) ** 2
+        close_open = np.log(df['close'] / df['open']) ** 2
+        df['gk'] = 0.5 * high_low - (2 * np.log(2) - 1) * close_open
+        df['gk'].fillna(0, inplace=True)
+
+        # Close-to-close (baseline comparison)
+        # Formula: (ln(Ct/Ct-1))² - simple squared returns
+        df['close_to_close'] = np.log(df['close'] / df['close'].shift(1)) ** 2
+        df['close_to_close'].fillna(0, inplace=True)
+
+        self.logger.info("Added OHLC features: overnight, parkinson, gk, close_to_close")
+        return df
+
     def _apply_financial_clipping(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Apply financial-specific clipping to prevent extreme values
@@ -163,11 +205,19 @@ class VN30FinancialDataProcessor:
         - Prevents numerical instability during training
         - Removes extreme outliers while preserving information
         - Standard practice in financial ML for volatility
-        """
-        volatility_cols = [col for col in df.columns if col.startswith('RV_')]
 
+        Now includes both RV and OHLC-based features
+        """
+        # Clip RV features
+        volatility_cols = [col for col in df.columns if col.startswith('RV_')]
         for col in volatility_cols:
             df[col] = np.clip(df[col], -5, 5)
+
+        # Clip OHLC features (same range for consistency)
+        ohlc_cols = ['overnight', 'parkinson', 'gk', 'close_to_close']
+        for col in ohlc_cols:
+            if col in df.columns:
+                df[col] = np.clip(df[col], -5, 5)
 
         return df
 

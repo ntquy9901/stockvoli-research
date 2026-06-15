@@ -44,31 +44,35 @@ class VN30MultiStockDataset(Dataset):
 
     def __init__(self, stock_data_dict: Dict[str, pd.DataFrame],
                  context_len: int = 128, horizon_len: int = 1,
-                 mode: str = 'train', samples_per_stock: int = 200):
+                 mode: str = 'train', samples_per_stock: int = 200,
+                 feature_type: str = 'RV_20'):
         self.context_len = context_len
         self.horizon_len = horizon_len
         self.mode = mode
         self.samples_per_stock = samples_per_stock
+        self.feature_type = feature_type  # 'RV_20', 'overnight', 'parkinson', 'gk', 'close_to_close'
 
         self.logger = logging.getLogger(__name__)
 
         # Process each stock as separate time series
         self.series_list = []
         for stock_name, df in stock_data_dict.items():
-            # Use RV_20 as our primary target variable
-            if 'RV_20' in df.columns:
-                series_data = df['RV_20'].dropna().values
+            # Use selected feature type as target variable
+            if self.feature_type in df.columns:
+                series_data = df[self.feature_type].dropna().values
 
                 # Ensure we have enough data
                 if len(series_data) >= context_len + horizon_len:
                     self.series_list.append({
                         'name': stock_name,
                         'data': series_data,
-                        'dates': df.index[~df['RV_20'].isna()]  # Keep dates for reference
+                        'dates': df.index[~df[self.feature_type].isna()]  # Keep dates for reference
                     })
-                    self.logger.info(f"Added {stock_name}: {len(series_data)} observations")
+                    self.logger.info(f"Added {stock_name}: {len(series_data)} {self.feature_type} observations")
                 else:
                     self.logger.warning(f"Skipped {stock_name}: insufficient data ({len(series_data)} < {context_len + horizon_len})")
+            else:
+                self.logger.warning(f"Skipped {stock_name}: {self.feature_type} not found in columns")
 
         # Determine train/test split point (temporal split)
         if mode == 'train':
@@ -126,17 +130,19 @@ class VN30MultiStockDataset(Dataset):
         sample = self.samples[idx]
         return {
             'context': torch.from_numpy(sample['context']).float(),  # More efficient than FloatTensor
-            'target': torch.tensor([sample['target']], dtype=torch.float32),
+            'ground_truth': torch.tensor([sample['target']], dtype=torch.float32),  # Changed to 'ground_truth' for compatibility
             'stock': sample['stock']
         }
 
 
-def create_vn30_dataloaders(config_path: str = 'configs/config.yaml') -> Tuple[DataLoader, DataLoader]:
+def create_vn30_dataloaders(config_path: str = 'configs/config.yaml',
+                           feature_type: str = 'RV_20') -> Tuple[DataLoader, DataLoader]:
     """
     Create train and test dataloaders for VN30 stocks
 
     Args:
         config_path: Path to configuration file
+        feature_type: Type of feature to use ('RV_20', 'overnight', 'parkinson', 'gk', 'close_to_close')
 
     Returns:
         Tuple of (train_loader, test_loader)
@@ -172,7 +178,8 @@ def create_vn30_dataloaders(config_path: str = 'configs/config.yaml') -> Tuple[D
         context_len=context_len,
         horizon_len=horizon_len,
         mode='train',
-        samples_per_stock=samples_per_stock
+        samples_per_stock=samples_per_stock,
+        feature_type=feature_type
     )
 
     test_dataset = VN30MultiStockDataset(
@@ -180,7 +187,8 @@ def create_vn30_dataloaders(config_path: str = 'configs/config.yaml') -> Tuple[D
         context_len=context_len,
         horizon_len=horizon_len,
         mode='test',
-        samples_per_stock=max(50, samples_per_stock // 4)  # Fewer samples for test
+        samples_per_stock=max(50, samples_per_stock // 4),  # Fewer samples for test
+        feature_type=feature_type
     )
 
     # Create dataloaders
