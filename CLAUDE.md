@@ -99,104 +99,6 @@
 - **Workarounds:** "Temporary fix until GPU memory is upgraded"
 - **Financial/statistical context:** "20-day window = one trading month in Vietnam"
 
-**Docstrings (Google Style):**
-```python
-def function_name(param1: type, param2: type) -> return_type:
-    """
-    One-line summary of what the function does.
-    
-    Longer explanation if needed (optional).
-    
-    Args:
-        param1: Description of param1
-        param2: Description of param2
-        
-    Returns:
-        Description of return value
-        
-    Raises:
-        ErrorName: When this error occurs
-        
-    Example:
-        >>> result = function_name(value1, value2)
-        >>> print(result)
-    """
-```
-
-### 2.6. Formatting and Style (The "Look")
-
-**General Principles:**
-- **Vertical openness:** Blank lines between concepts
-- **Related code together:** Don't separate related logic
-- **Declare close to use:** Define variables near where they're used
-- **Consistent style:** Use same formatting throughout (linter/formatter helps)
-
-**PEP 8 Compliance:**
-- **snake_case for functions/variables:** `calculate_metrics`, `train_model`
-- **PascalCase for classes:** `TimesFMModel`, `DataProcessor`
-- **4 spaces indentation:** Never tabs
-- **Line length:** Aim for 79-100 characters (not hard limit)
-- **Imports:** Group and order (stdlib, third-party, local)
-
-**Less is More:**
-- **Short code is better:** Faster to read and understand (but not at expense of clarity)
-- **No commented code:** Delete it, git tracks history
-- **Minimal blank lines:** Use to separate concepts, not decorate
-- **Avoid unnecessary verbosity:** Direct > clever
-
-### 2.7. Anti-Patterns (The "Don'ts")
-
-**Naming Anti-Patterns:**
-- ❌ Single letters (except loop counters): `x`, `y`, `data`
-- ❌ Generic names: `manager`, `processor`, `helper`
-- ❌ Abbreviations: `lr`, `clf`, `pred`
-- ❌ Same word different meanings: `get` for fetch/compute/create
-- ❌ Cryptic names: `tmp`, `var`, `stuff`
-
-**Function Anti-Patterns:**
-- ❌ Large functions (>50 lines): Do too many things
-- ❌ Multiple responsibilities: Load, process, and save in one function
-- ❌ Many parameters (>5): Hard to understand and use
-- ❌ Side effects: Modify inputs unexpectedly
-- ❌ Deep nesting: Hard to read, extract to functions
-
-**Code Organization Anti-Patterns:**
-- ❌ Copy-paste code: Should be functions
-- ❌ Mixed concerns: Data, model, evaluation in one file
-- ❌ Circular imports: Files depend on each other
-- ❌ Deep nesting: Many directories with few files
-- ❌ God objects: Classes that do everything
-
-**Comment Anti-Patterns:**
-- ❌ Commenting the obvious: `i = i + 1  # increment i`
-- ❌ Outdated comments: Code changed, comments didn't
-- ❌ Commented code: Blocks of "backup" code
-- ❌ Noise comments: No useful information
-- ❌ Misleading comments: Say one thing, code does another
-
-### 2.8. Research-Specific Best Practices
-
-**Experimentation Code:**
-- **Version control everything:** Never lose working code
-- **Track hyperparameters:** Log all configs and results
-- **Reproducible seeds:** Set random seeds for all libraries
-- **Save intermediate results:** Don't recompute everything
-- **Document decisions:** Why you chose X over Y
-
-**Data Processing:**
-- **Separate raw and processed:** Never overwrite raw data
-- **Log transformations:** Keep track of all data changes
-- **Validate inputs:** Check data quality early
-- **No data leakage:** Split before any transformations
-- **Document pipeline:** Order of operations matters
-
-**Model Training:**
-- **Save checkpoints:** Don't lose progress
-- **Log metrics:** Track all metrics, not just loss
-- **Validate during training:** Don't wait until end
-- **Handle failures:** Graceful degradation on errors
-- **Document architecture:** Why this model/structure
-
 **Code Quality Levels:**
 1. **Total mess:** Quick POC, testing ideas (acceptable for exploration)
 2. **Readable:** Others can understand (minimum for sharing)
@@ -258,7 +160,7 @@ global_mean = data.mean()
 data_scaled = (data - global_mean) / global_std()
 ```
 
-### 2.3 Logging & Metadata
+### 2.3. Logging & Metadata
 - **No Print Statements:** Không dùng `print()` trong production code, sử dụng `logging`:
 ```python
 import logging
@@ -387,7 +289,7 @@ def normalize_for_vietnamese_stocks(stock_data_dict):
     return normalized
 ```
 
-### 4.2 Financial Data Processing Pipeline
+### 4.2. Financial Data Processing Pipeline
 - **Pipeline Order:** Tuân thủ đúng thứ tự:
 ```python
 # 1. Log transformation (ngăn extreme events)
@@ -459,7 +361,7 @@ def diebold_mariano_test(actual: np.ndarray, model_pred: np.ndarray,
     }
 ```
 
-### 5.2 Evaluation Standards
+### 5.2. Evaluation Standards
 - **Batch Evaluation:** Evaluate all metrics together, không từng metric riêng lẻ:
 ```python
 # ✅ CORRECT - Comprehensive evaluation
@@ -491,7 +393,7 @@ class VN30DataProcessorFactory:
     def create_processor(self, type): ...
 ```
 
-### 6.2 File Naming & Organization
+### 6.2. File Naming & Organization
 - **Script Naming:** Use `snake_case.py` for all scripts:
 ```
 src/
@@ -511,7 +413,7 @@ torch.save(model, f"models/checkpoints/model_epoch_{epoch}_r2_{r2:.3f}.pt")
 torch.save(model, f"models/checkpoint_{epoch}.pt")
 ```
 
-### 6.3 Configuration Management
+### 6.3. Configuration Management
 - **Centralized Configuration:** Sử dụng `configs/config.yaml` duy nhất:
 ```python
 # Load configuration
@@ -553,7 +455,7 @@ for epoch in range(num_epochs):
     logging.info(f"  MSE: {eval_metrics['mse']:.6f}")
 ```
 
-### 7.2 Checkpoint Management
+### 7.2. Checkpoint Management
 - **Save Best Models:** Chỉ save khi cải thiện:
 ```python
 best_r2 = 0.0
@@ -567,7 +469,7 @@ for epoch in range(num_epochs):
         logging.info(f"  New best model saved! R² = {current_r2:.4f}")
 ```
 
-### 7.3 Experiment Tracking
+### 7.3. Experiment Tracking
 - **JSON Logging:** Save experiment metadata as JSON:
 ```python
 import json
@@ -585,7 +487,7 @@ def log_experiment(epoch, metrics, config):
         json.dump(experiment_log, f, indent=2)
 ```
 
-### 7.4 File Management and Archiving
+### 7.4. File Management and Archiving
 - **Archive Old Files:** Khi fix hoặc tạo file mới, bắt buộc move file cũ vào `archived/` folder:
 ```python
 # ✅ CORRECT - Archive old files
@@ -619,7 +521,7 @@ mv src/train.py archived/train_old_2025-06-13_refactored.py
   - Giữ reference cho việc debug và học hỏi
   - Track evolution của codebase
 
-### 7.5 Learning Curves (MANDATORY)
+### 7.5. Learning Curves (MANDATORY)
 - **BẮT BUỘC Vẽ Learning Curves:** Mọi lần training đều phải vẽ learning curves để detect overfitting:
 ```python
 import matplotlib.pyplot as plt
@@ -727,7 +629,7 @@ experiment_log['learning_curves_path'] = final_plot_path
 
 ## 8. GPU Training Considerations
 
-### 8.1 GPU Memory Management
+### 8.1. GPU Memory Management
 - **Memory Validation:** Check GPU memory trước training:
 ```python
 def validate_gpu_memory():
@@ -752,7 +654,7 @@ except torch.cuda.OutOfMemoryError:
     # Retry with smaller batch size
 ```
 
-### 8.2 Mixed Precision Training
+### 8.2. Mixed Precision Training
 - **Use bfloat16:** Sử dụng bfloat16 để tiết kiệm memory:
 ```python
 dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
@@ -765,7 +667,7 @@ model = TimesFm2_5ModelForPrediction.from_pretrained(
 
 ## 9. Error Handling & Validation
 
-### 9.1 Pre-flight Validation
+### 9.1. Pre-flight Validation
 - **Validate Inputs:** Kiểm tra data quality trước expensive operations:
 ```python
 def validate_financial_data(data: pd.DataFrame) -> bool:
@@ -779,7 +681,7 @@ def validate_financial_data(data: pd.DataFrame) -> bool:
     return True
 ```
 
-### 9.2 Training Error Handling
+### 9.2. Training Error Handling
 - **Graceful Degradation:** Xử lý errors một cách graceful:
 ```python
 try:
@@ -802,7 +704,7 @@ except Exception as e:
 
 ## 10. Documentation & Comments
 
-### 10.1 Financial ML Docstrings
+### 10.1. Financial ML Docstrings
 - **Explain Financial Logic:** Docstrings phải giải thích ý nghĩa tài chính:
 ```python
 def calculate_realized_volatility(returns: pd.Series, window: int = 20) -> pd.Series:
@@ -831,7 +733,7 @@ def calculate_realized_volatility(returns: pd.Series, window: int = 20) -> pd.Se
     """
 ```
 
-### 10.2 Comments for Complex Logic
+### 10.2. Comments for Complex Logic
 - **Explain Counter-intuitive Financial Logic:**
 ```python
 # Financial Note: We use log returns instead of raw returns because:
@@ -848,7 +750,7 @@ rv_clipped = np.clip(realized_volatility, -5, 5)
 
 ## 11. Testing & Quality Assurance
 
-### 11.1 Data Quality Tests
+### 11.1. Data Quality Tests
 ```python
 def test_financial_data_quality(data: pd.DataFrame):
     """Test data quality for financial ML"""
@@ -864,7 +766,7 @@ def test_financial_data_quality(data: pd.DataFrame):
     assert 'log_returns' in data.columns, "Log returns missing"
 ```
 
-### 11.2 Metric Calculation Tests
+### 11.2. Metric Calculation Tests
 ```python
 def test_metric_functions():
     """Test that metric calculations are correct"""
@@ -883,26 +785,376 @@ def test_metric_functions():
 
 ## 12. Anti-Patterns to Avoid
 
-### 12.1 Architecture Anti-Patterns
+### 12.1. Architecture Anti-Patterns
 - **❌ Custom Transformers:** Đừng viết TimesFM transformer từ đầu
 - **❌ AdamW Optimizer:** Đừng dùng AdamW cho financial time series
 - **❌ Raw Returns:** Đừng dùng raw returns (pct_change) cho financial ML
 - **❌ Single Dataset:** Đừng gộp tất cả stocks thành một time series
 
-### 12.2 Data Processing Anti-Patterns
+### 12.2. Data Processing Anti-Patterns
 - **❌ Global Scaling:** Đừng scale toàn bộ dataset trước train/test split
 - **❌ Skip Log Transformation:** Đừng bỏ qua log transformation cho financial data
 - **❌ Ignore Financial Clipping:** Đừng skip financial clipping (-5,5 range)
 
-### 12.3 Training Anti-Patterns
+### 12.3. Training Anti-Patterns
 - **❌ Print Statements:** Đừng dùng print() cho experiment tracking
 - **❌ Inconsistent Metrics:** Đừng dùng different metric names
 - **❌ Missing Seeds:** Đừng quên random seeds cho reproducibility
 - **❌ Hard-coded Parameters:** Đừng hard-code learning rates, batch sizes
 
-## 13. Quick Reference for TimesFM VN30 Project
+## 13. Google Colab Notebook Best Practices
 
-### 13.1 Mandatory Function Names
+### 13.1. CRITICAL: Package Name Rules
+
+**MANDATORY Package Names:**
+```python
+# ✅ CORRECT - Use exact package names
+!pip install pyyaml      # NOT yaml
+!pip install accelerate  # NOT accel
+!pip install transformers # NOT transformer
+
+# ❌ WRONG - Common mistakes
+!pip install yaml         # Package doesn't exist
+!pip install transformer  # Wrong name
+```
+
+**Why This Matters:**
+- `yaml` package doesn't exist → `ERROR: No matching distribution found for yaml`
+- Correct name is `pyyaml` → Always use exact package names
+- This is especially important in Colab where error messages can be confusing
+
+### 13.2. CRITICAL: Torchao Version Conflict
+
+**MANDATORY: Uninstall torchao before training:**
+```python
+# ✅ CORRECT - Always uninstall torchao first
+!pip uninstall -y torchao
+
+# Setup memory after uninstall
+import os
+os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
+
+# ❌ WRONG - Skip this step
+# Error: Found an incompatible version of torchao. Found version 0.10.0, 
+#        but only versions above 0.16.0 are supported
+# LoRA setup will FAIL
+```
+
+**Why This Matters:**
+- Colab installs torchao by default
+- TimesFM/PEFT requires torchao > 0.16.0, but Colab has 0.10.0
+- Version conflict causes LoRA adapter setup to fail
+- Must uninstall before any model training
+
+### 13.3. CRITICAL: Directory Creation
+
+**MANDATORY: Create directories before training:**
+```python
+# ✅ CORRECT - Create all necessary directories
+!mkdir -p experiments models
+
+# ❌ WRONG - Assume directories exist
+# Training will FAIL if directories don't exist
+# Model checkpoints can't be saved
+```
+
+**Why This Matters:**
+- Training scripts assume `experiments/` and `models/` directories exist
+- Missing directories cause file write failures during training
+- Use `-p` flag to create parent directories if needed
+
+### 13.4. CRITICAL: Persistent Directory Change
+
+**MANDATORY: Use os.chdir() for persistence:**
+```python
+# ✅ CORRECT - Use os.chdir() for persistent directory change
+import os
+os.chdir('stockvoli-research')
+
+# ❌ WRONG - %cd doesn't always persist
+%cd stockvoli-research  # May not persist across cells
+```
+
+**Why This Matters:**
+- `%cd` is a Colab magic command that may not persist
+- `os.chdir()` is proper Python and persists across all cells
+- Training scripts need to be in correct directory to find data files
+- Prevents "file not found" errors during training
+
+### 13.5. MANDATORY: Memory Optimization Setup
+
+**CRITICAL: Setup CUDA memory optimization:**
+```python
+# ✅ CORRECT - Setup memory optimization BEFORE any model operations
+import os
+os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
+
+# ❌ WRONG - Skip this step
+# May cause CUDA memory errors during training
+# Especially important for TimesFM 2.5 with large models
+```
+
+**Why This Matters:**
+- TimesFM 2.5 is a large model (232M parameters)
+- Without memory optimization, may cause CUDA allocation failures
+- Must be set BEFORE loading model or starting training
+- Same setting used in working G4 notebook
+
+### 13.6. Notebook Structure Best Practices
+
+**MANDATORY: Complete notebook structure (13 cells minimum):**
+
+1. **GPU Check** - Verify hardware availability
+2. **Clone + Setup** - Repository + **mkdir + os.chdir (CRITICAL)**
+3. **Dependencies** - **Torchao uninstall + memory setup (CRITICAL)**
+4. **Import Verify** - Test all packages work
+5. **Config Verify** - Load and display settings (CRITICAL)
+6. **Data Verify** - Check OHLC features exist
+7. **Run Test** - Execute training script
+8. **Monitor Header** - Section divider (optional)
+9. **Training Monitor** - Logs + GPU utilization (CRITICAL)
+10. **Results Check** - Enhanced analysis (CRITICAL)
+11. **Summary** - Expected outcomes
+12. **Documentation** - Complete context
+13. **Backup Commands** - Alternative execution method
+
+**Why Each Cell Matters:**
+- **Cell 2:** Directory setup prevents file not found errors
+- **Cell 3:** Torchao fix prevents LoRA setup failures
+- **Cell 5:** Config verification ensures correct parameters
+- **Cell 9:** Monitoring allows tracking training progress
+- **Cell 10:** Results checking validates experiment success
+
+### 13.7. JSON Notebook Format Rules
+
+**MANDATORY: Valid JSON structure:**
+```python
+# ✅ CORRECT - Valid JSON notebook
+{
+  "cells": [
+    {
+      "cell_type": "code",
+      "source": ["print('hello')"]  # Array of strings
+    }
+  ],
+  "metadata": {...},
+  "nbformat": 4,
+  "nbformat_minor": 4
+}
+
+# ❌ WRONG - Invalid JSON
+{
+  "cells": [
+    {
+      "source": "print('hello')"  # String, not array
+    }
+  ]
+}
+
+# ❌ WRONG - Unicode issues
+# Avoid special Unicode characters in code cells
+# Use ASCII-safe strings in markdown
+```
+
+**Why This Matters:**
+- Colab parses notebooks as JSON
+- Invalid JSON causes parsing errors
+- "SyntaxError: Unexpected token" errors indicate JSON issues
+- Always validate JSON before pushing to git
+
+### 13.8. Dependency Installation Strategy
+
+**PREFERRED: Use pre-installed Colab packages:**
+```python
+# ✅ RECOMMENDED - Disable install, use pre-installed
+# Install dependencies (DISABLED - Already installed in Colab)
+# !pip install -q transformers peft torch pandas numpy pyyaml accelerate
+
+print("Using pre-installed Colab packages")
+print("If you get import errors, uncomment pip install lines above")
+
+# ❌ AVOID - Always reinstall
+# Wastes time, may cause version conflicts
+# Colab already has most packages installed
+```
+
+**When to Enable Installation:**
+- Only if you get specific import errors
+- If you need specific versions
+- For testing new packages
+- If Colab environment changes
+
+### 13.9. Training Monitoring Requirements
+
+**MANDATORY: Monitor training during execution:**
+```python
+# ✅ CORRECT - Monitor training progress
+print("Training logs:")
+!tail -20 experiments/model_training.log
+
+print("GPU utilization:")
+!nvidia-smi --query-gpu=utilization.gpu,memory.used,memory.total --format=csv
+
+import torch
+allocated = torch.cuda.memory_allocated(0) / 1e9
+total = torch.cuda.get_device_properties(0).total_memory / 1e9
+print(f"GPU Memory: {allocated:.1f}/{total:.1f} GB")
+```
+
+**Why This Matters:**
+- Training takes hours (3-8 hours typical)
+- Need to detect failures early
+- GPU utilization indicates training health
+- Memory usage helps prevent OOM errors
+- Same monitoring as working G4 notebook
+
+### 13.10. Results Validation Requirements
+
+**MANDATORY: Comprehensive results checking:**
+```python
+# ✅ CORRECT - Complete results validation
+results_file = Path('experiments/feature_comparison_results_fixed.json')
+
+if results_file.exists():
+    with open(results_file, 'r') as f:
+        results = json.load(f)
+    
+    # Check status
+    if 'RV_20' in results and 'overnight' in results:
+        rv20_result = results['RV_20']
+        overnight_result = results['overnight']
+        
+        # Validate success
+        if rv20_result['status'] == 'success' and overnight_result['status'] == 'success':
+            # Calculate improvement
+            improvement = (rv20_loss - overnight_loss) / rv20_loss * 100
+            
+            # Check success criteria
+            if improvement > 0:
+                print("SUCCESS: Overnight volatility is better!")
+            else:
+                print("Baseline still better")
+```
+
+**Why This Matters:**
+- Training may complete but produce invalid results
+- Need to validate both features succeeded
+- Statistical significance matters
+- Must check for error messages
+- Same validation as G4 notebook
+
+### 13.11. Common Colab Issues & Solutions
+
+**ISSUE 1: "SyntaxError: Unexpected token"**
+- **Cause:** Invalid JSON in notebook file
+- **Solution:** Validate JSON with `python -c "import json; json.load(open('notebook.ipynb'))"`
+- **Prevention:** Use Write tool correctly, don't edit JSON manually
+
+**ISSUE 2: "No matching distribution found for yaml"**
+- **Cause:** Wrong package name `yaml` instead of `pyyaml`
+- **Solution:** Use `!pip install pyyaml`
+- **Prevention:** Always use exact package names
+
+**ISSUE 3: "torchao version incompatible"**
+- **Cause:** torchao 0.10.0 conflicts with PEFT
+- **Solution:** `!pip uninstall -y torchao` before training
+- **Prevention:** Always include torchao uninstall cell
+
+**ISSUE 4: "File not found" during training**
+- **Cause:** Wrong directory or missing directories
+- **Solution:** Use `os.chdir()` and `!mkdir -p experiments models`
+- **Prevention:** Always create directories before training
+
+**ISSUE 5: "CUDA out of memory"**
+- **Cause:** Insufficient GPU memory for batch size
+- **Solution:** Reduce batch size in config.yaml
+- **Prevention:** Use G4-optimized settings (batch_size: 12)
+
+### 13.12. Notebook Creation Checklist
+
+**MANDATORY: Check all items before considering notebook complete:**
+
+- [ ] Package names are correct (pyyaml, NOT yaml)
+- [ ] Torchao uninstall included
+- [ ] Memory optimization setup included
+- [ ] Directory creation included
+- [ ] Persistent directory change (os.chdir)
+- [ ] Config verification included
+- [ ] Data verification included
+- [ ] Training monitoring included
+- [ ] Results validation included
+- [ ] JSON format validated
+- [ ] All 13 cells present
+- [ ] Backup commands provided
+- [ ] Expected timeline documented
+
+### 13.13. G4 Notebook Compatibility Rules
+
+**MANDATORY: Match G4 notebook structure exactly:**
+
+**G4 Notebook Elements to Include:**
+1. ✅ `!pip uninstall -y torchao` (Cell 4)
+2. ✅ `!mkdir -p experiments models` (Cell 6)
+3. ✅ `os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'` (Cell 4)
+4. ✅ `os.chdir('stockvoli-research')` (Cell 6)
+5. ✅ Config load and verification (Cell 8)
+6. ✅ Training logs monitoring (Cell 12)
+7. ✅ GPU utilization checks (Cell 12)
+8. ✅ Enhanced results validation (Cell 14)
+
+**Why G4 Compatibility Matters:**
+- G4 notebook is proven to work
+- Contains solutions to all common issues
+- Tested on actual hardware
+- Optimized for memory and performance
+- Reference for all future notebooks
+
+### 13.14. Quick Reference - Common Commands
+
+**Package Installation:**
+```python
+# CORRECT
+!pip install pyyaml accelerate transformers peft torch pandas numpy
+
+# WRONG
+!pip install yaml  # Wrong name
+```
+
+**Torchao Fix:**
+```python
+# ALWAYS include this
+!pip uninstall -y torchao
+import os
+os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
+```
+
+**Directory Setup:**
+```python
+# ALWAYS include this
+!mkdir -p experiments models
+import os
+os.chdir('stockvoli-research')
+```
+
+**Config Verification:**
+```python
+# ALWAYS include this
+import yaml
+with open('configs/config.yaml', 'r') as f:
+    config = yaml.safe_load(f)
+print(f"Batch size: {config['training']['batch_size']}")
+```
+
+**Monitoring:**
+```python
+# ALWAYS include this
+!tail -20 experiments/model_training.log
+!nvidia-smi --query-gpu=utilization.gpu,memory.used,memory.total
+```
+
+## 14. Quick Reference for TimesFM VN30 Project
+
+### 14.1. Mandatory Function Names
 ```python
 # Metrics (LUÔN LUÔN exact names này)
 calculate_qlike(actuals, predictions)
@@ -924,7 +1176,7 @@ train_model(model, data_loader, optimizer)
 diebold_mariano_test(actual, model_pred, bench_pred)
 ```
 
-### 13.2 File Structure Quick Reference
+### 14.2. File Structure Quick Reference
 ```
 src/
 ├── data_processing.py      # Financial transformations
@@ -935,7 +1187,7 @@ src/
 └── inference.py          # Simple predictions
 ```
 
-### 13.3 Configuration Reference
+### 14.3. Configuration Reference
 ```yaml
 # From configs/config.yaml
 data:
@@ -973,6 +1225,7 @@ incremental_learning:
 
 ---
 
-*Last Updated: 2026-06-09*
+*Last Updated: 2026-06-15*
 *Project: TimesFM VN30 Financial Fine-tuning*
 *Based on: Architecture Workflow Completion*
+*Colab Notebook Best Practices Added: Section 13*
